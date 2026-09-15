@@ -3,6 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1B2A4A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Carmen's Voley">
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%20%22Carmen%27s%20Voley%22%2C%20%22short_name%22%3A%20%22C.Voley%22%2C%20%22start_url%22%3A%20%22.%22%2C%20%22display%22%3A%20%22standalone%22%2C%20%22background_color%22%3A%20%22%23F1F5F9%22%2C%20%22theme_color%22%3A%20%22%231B2A4A%22%2C%20%22icons%22%3A%20%5B%7B%22src%22%3A%20%22data%3Aimage/png%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAAFYklEQVR4nO3dUXLcNhBFUSjlXdgrsHdir9dLyQ6ykHywijUliiSGj%2Bh%2BDd7zmSgKBrhuUJLt%2Bfj%2B83cDrvonewGojYAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKChIAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKC5Fv2Alz89%2B/fd/%2BTH7/%2BjFhJLR/P/KPNF3Lp8cCkHhTQoGj2PCSm%2BQMK7mZr7pKmDSi9m60pS5otIMNutmYqaZ6AxHS%2BPNTXz7n9gBH/x3Jm%2BDL%2B2kHq5/fpM7y7jOXjq2dUO6B3z2zoab1%2B8v6FVc%2BoakD9J5RyNu/GVDejkj/K6Kznx68/DkfSv4wSXwF8UmwC9WyxQzRb66qOX0K5UVRpAp3WYzJyjvUsstAoqjGBetKJWcldlgUfvK4qo6jABDqup8TU2XO6eP9R5B7QaT1hKxmndEO%2BV9gT0lkd32jO15npBHpUPauKo8gxoIOdKv3E0%2BP4BRo2ZBfQcT2RK0lUqCGvgKhnVaUho4D29mX6a2vPwQv3acgloIN6glfixrwhi4Co55hzQ/kBUU8P24aSA6Kefp4N5U%2BgLerZY7gzmQF9%2BUvHcI%2BsnP7m/2BpAVHPZVYN5QSU/ug3pZRdNXoGYvz089mrhIC4vG5hcpFFB0Q9N3JoyOgKQ0WhATF%2Bbpc%2BhOICop5BchviCoMkKCDGz1CJQyhtAlHPvbL2MyIgvu%2BcJWDncyYQ42eElF0dHhDjJ9fo/U%2BYQIyfceL3dmxAjB8HQ08hegIxfkYL3mG%2BkQjJwIC4v3yMO4vQCcT9FSNyn7nCIBkV0HZmMn4i3f7GDHuYQJAQECRDAuLrL08jziVoAvEAFC9mz7nCICEgSO4PiAcgZ7efTsQE4gEoS8DOc4VBQkCQEBAkBATJzQHxM1Q3o3%2BqygSChIAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKChIAgISBICAiSmwMK%2B0sh0Gn0b/FjAkFCQJAQECQEBAlvtjKzkm%2B2wp/jcXb76XCFQUJAkGS%2B5SWGKvyWlzwGeRpxLlxhkBAQJKMC4qequcL%2BmhQmECShATGEYkTu88CA%2BFrMx7iz4AqDJDogbrHRgnd4bEDcYg6GnkLCFcYQGid%2Bb4cHxBDKNXr/cx6iGUIjpOwqb7Yys5nfbIUhdK%2Bs/cx8y0sausuXO8lbXqKAuIAYQoMkjp8WPIFo6Ha59TSuMIiiA2II3Sh9/LSUCURDt3Cop1ldYTTUz2evcgLie9MjpOxq2gTiIrvM5PJaZF5hNHSBVT3N6hloRUN7DHcmOaC9XzqGO5Vub09yHyjzJxAN9fCspzkE1GjojG09zSSgRkP7nOtpPgG1w4aemdHBCzepp1kF1A735WkNHbxen3qaW0CNhlprdepphgG1s4bmzuj4BbrV0zwDamc7NWtDx6/LsJ7W2rfsBexa9mtvT5d/7rmnF1RMZ2E6gVZPGEV162n%2BAbWOhupmdLp483qa8xX26vg6awVvtNPoq7yWAhNodbqnJaZRzyKr1NOqTKDV6Sh6/bdWx9BZttWae1SaQKvOXTYZSP3LKFdPKzeBVj2jaPH6MWEn9G64FdNZVA1o0Z/RYmhM16Zd3XQWtQNavJvR4tPHXzhI8X6sns7i4/vP39lruJPDQ8%2BpOdJZzBbQyrCkmbpZTRvQKr2kKbtZzR/QKrikubtZPSigV4Niekg0rx4a0NaFpB6YyxYBQVLyRxnwQUCQEBAkBAQJAUFCQJAQECQEBAkBQUJAkBAQJAQECQFBQkCQEBAkBAQJAUFCQJAQECQEBAkBQUJAkBAQJAQEyf%2BmUyh9AdGX0gAAAABJRU5ErkJggg%3D%3D%22%2C%20%22sizes%22%3A%20%22192x192%22%2C%20%22type%22%3A%20%22image/png%22%7D%2C%20%7B%22src%22%3A%20%22data%3Aimage/png%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAAFYklEQVR4nO3dUXLcNhBFUSjlXdgrsHdir9dLyQ6ykHywijUliiSGj%2Bh%2BDd7zmSgKBrhuUJLt%2Bfj%2B83cDrvonewGojYAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKChIAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKC5Fv2Alz89%2B/fd/%2BTH7/%2BjFhJLR/P/KPNF3Lp8cCkHhTQoGj2PCSm%2BQMK7mZr7pKmDSi9m60pS5otIMNutmYqaZ6AxHS%2BPNTXz7n9gBH/x3Jm%2BDL%2B2kHq5/fpM7y7jOXjq2dUO6B3z2zoab1%2B8v6FVc%2BoakD9J5RyNu/GVDejkj/K6Kznx68/DkfSv4wSXwF8UmwC9WyxQzRb66qOX0K5UVRpAp3WYzJyjvUsstAoqjGBetKJWcldlgUfvK4qo6jABDqup8TU2XO6eP9R5B7QaT1hKxmndEO%2BV9gT0lkd32jO15npBHpUPauKo8gxoIOdKv3E0%2BP4BRo2ZBfQcT2RK0lUqCGvgKhnVaUho4D29mX6a2vPwQv3acgloIN6glfixrwhi4Co55hzQ/kBUU8P24aSA6Kefp4N5U%2BgLerZY7gzmQF9%2BUvHcI%2BsnP7m/2BpAVHPZVYN5QSU/ug3pZRdNXoGYvz089mrhIC4vG5hcpFFB0Q9N3JoyOgKQ0WhATF%2Bbpc%2BhOICop5BchviCoMkKCDGz1CJQyhtAlHPvbL2MyIgvu%2BcJWDncyYQ42eElF0dHhDjJ9fo/U%2BYQIyfceL3dmxAjB8HQ08hegIxfkYL3mG%2BkQjJwIC4v3yMO4vQCcT9FSNyn7nCIBkV0HZmMn4i3f7GDHuYQJAQECRDAuLrL08jziVoAvEAFC9mz7nCICEgSO4PiAcgZ7efTsQE4gEoS8DOc4VBQkCQEBAkBATJzQHxM1Q3o3%2BqygSChIAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKChIAgISBICAiSmwMK%2B0sh0Gn0b/FjAkFCQJAQECQEBAlvtjKzkm%2B2wp/jcXb76XCFQUJAkGS%2B5SWGKvyWlzwGeRpxLlxhkBAQJKMC4qequcL%2BmhQmECShATGEYkTu88CA%2BFrMx7iz4AqDJDogbrHRgnd4bEDcYg6GnkLCFcYQGid%2Bb4cHxBDKNXr/cx6iGUIjpOwqb7Yys5nfbIUhdK%2Bs/cx8y0sausuXO8lbXqKAuIAYQoMkjp8WPIFo6Ha59TSuMIiiA2II3Sh9/LSUCURDt3Cop1ldYTTUz2evcgLie9MjpOxq2gTiIrvM5PJaZF5hNHSBVT3N6hloRUN7DHcmOaC9XzqGO5Vub09yHyjzJxAN9fCspzkE1GjojG09zSSgRkP7nOtpPgG1w4aemdHBCzepp1kF1A735WkNHbxen3qaW0CNhlprdepphgG1s4bmzuj4BbrV0zwDamc7NWtDx6/LsJ7W2rfsBexa9mtvT5d/7rmnF1RMZ2E6gVZPGEV162n%2BAbWOhupmdLp483qa8xX26vg6awVvtNPoq7yWAhNodbqnJaZRzyKr1NOqTKDV6Sh6/bdWx9BZttWae1SaQKvOXTYZSP3LKFdPKzeBVj2jaPH6MWEn9G64FdNZVA1o0Z/RYmhM16Zd3XQWtQNavJvR4tPHXzhI8X6sns7i4/vP39lruJPDQ8%2BpOdJZzBbQyrCkmbpZTRvQKr2kKbtZzR/QKrikubtZPSigV4Niekg0rx4a0NaFpB6YyxYBQVLyRxnwQUCQEBAkBAQJAUFCQJAQECQEBAkBQUJAkBAQJAQECQFBQkCQEBAkBAQJAUFCQJAQECQEBAkBQUJAkBAQJAQEyf%2BmUyh9AdGX0gAAAABJRU5ErkJggg%3D%3D%22%2C%20%22sizes%22%3A%20%22512x512%22%2C%20%22type%22%3A%20%22image/png%22%7D%5D%7D">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAIAAADdvvtQAAAFYklEQVR4nO3dUXLcNhBFUSjlXdgrsHdir9dLyQ6ykHywijUliiSGj+h+Dd7zmSgKBrhuUJLt+fj+83cDrvonewGojYAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKChIAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKC5Fv2Alz89+/fd/+TH7/+jFhJLR/P/KPNF3Lp8cCkHhTQoGj2PCSm+QMK7mZr7pKmDSi9m60pS5otIMNutmYqaZ6AxHS+PNTXz7n9gBH/x3Jm+DL+2kHq5/fpM7y7jOXjq2dUO6B3z2zoab1+8v6FVc+oakD9J5RyNu/GVDejkj/K6Kznx68/DkfSv4wSXwF8UmwC9WyxQzRb66qOX0K5UVRpAp3WYzJyjvUsstAoqjGBetKJWcldlgUfvK4qo6jABDqup8TU2XO6eP9R5B7QaT1hKxmndEO+V9gT0lkd32jO15npBHpUPauKo8gxoIOdKv3E0+P4BRo2ZBfQcT2RK0lUqCGvgKhnVaUho4D29mX6a2vPwQv3acgloIN6glfixrwhi4Co55hzQ/kBUU8P24aSA6Kefp4N5U+gLerZY7gzmQF9+UvHcI+snP7m/2BpAVHPZVYN5QSU/ug3pZRdNXoGYvz089mrhIC4vG5hcpFFB0Q9N3JoyOgKQ0WhATF+bpc+hOICop5BchviCoMkKCDGz1CJQyhtAlHPvbL2MyIgvu+cJWDncyYQ42eElF0dHhDjJ9fo/U+YQIyfceL3dmxAjB8HQ08hegIxfkYL3mG+kQjJwIC4v3yMO4vQCcT9FSNyn7nCIBkV0HZmMn4i3f7GDHuYQJAQECRDAuLrL08jziVoAvEAFC9mz7nCICEgSO4PiAcgZ7efTsQE4gEoS8DOc4VBQkCQEBAkBATJzQHxM1Q3o3+qygSChIAgISBICAgSAoKEgCAhIEgICBICgoSAICEgSAgIEgKChIAgISBICAiSmwMK+0sh0Gn0b/FjAkFCQJAQECQEBAlvtjKzkm+2wp/jcXb76XCFQUJAkGS+5SWGKvyWlzwGeRpxLlxhkBAQJKMC4qequcL+mhQmECShATGEYkTu88CA+FrMx7iz4AqDJDogbrHRgnd4bEDcYg6GnkLCFcYQGid+b4cHxBDKNXr/cx6iGUIjpOwqb7Yys5nfbIUhdK+s/cx8y0sausuXO8lbXqKAuIAYQoMkjp8WPIFo6Ha59TSuMIiiA2II3Sh9/LSUCURDt3Cop1ldYTTUz2evcgLie9MjpOxq2gTiIrvM5PJaZF5hNHSBVT3N6hloRUN7DHcmOaC9XzqGO5Vub09yHyjzJxAN9fCspzkE1GjojG09zSSgRkP7nOtpPgG1w4aemdHBCzepp1kF1A735WkNHbxen3qaW0CNhlprdepphgG1s4bmzuj4BbrV0zwDamc7NWtDx6/LsJ7W2rfsBexa9mtvT5d/7rmnF1RMZ2E6gVZPGEV162n+AbWOhupmdLp483qa8xX26vg6awVvtNPoq7yWAhNodbqnJaZRzyKr1NOqTKDV6Sh6/bdWx9BZttWae1SaQKvOXTYZSP3LKFdPKzeBVj2jaPH6MWEn9G64FdNZVA1o0Z/RYmhM16Zd3XQWtQNavJvR4tPHXzhI8X6sns7i4/vP39lruJPDQ8+pOdJZzBbQyrCkmbpZTRvQKr2kKbtZzR/QKrikubtZPSigV4Niekg0rx4a0NaFpB6YyxYBQVLyRxnwQUCQEBAkBAQJAUFCQJAQECQEBAkBQUJAkBAQJAQECQFBQkCQEBAkBAQJAUFCQJAQECQEBAkBQUJAkBAQJAQEyf+mUyh9AdGX0gAAAABJRU5ErkJggg==">
 <title>Carmen's Voley</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js" defer></script>
 <script type="module">
@@ -32,7 +38,9 @@
         buenpastor: { name: "Buen Pastor", accent: "#1E40AF", accentDark: "#0C447C" },
         tomares:    { name: "Voleibol Tomares", accent: "#D8402F", accentDark: "#1B2A4A" }
     };
+    const CATEGORIAS = ["Prebenjamín", "Benjamín", "Alevín", "Infantil", "Cadete", "Juvenil", "Senior"];
     let currentClub = "tomares";
+    let currentCategoria = "Infantil";
     let currentUserDoc = null; // { role: 'admin'|'coach', clubs: ['buenpastor','tomares'] }
     let currentUser = null;
 
@@ -69,6 +77,7 @@
             appSection.style.display = "block";
             $("userEmail").textContent = user.email;
             renderClubSelector(clubesPermitidos);
+            renderCategoriaSelector();
             applyClubTheme();
             goHome();
         } else {
@@ -119,11 +128,32 @@
         };
     }
 
+    // ========== SELECTOR DE CATEGORÍA ==========
+    // Cada club puede llevar varios equipos (Alevín, Infantil, Cadete...).
+    // Este selector filtra Scout/Asistencia/Partido para trabajar solo con
+    // la categoría elegida, sin mezclar jugadoras de distintos equipos.
+    function renderCategoriaSelector() {
+        const sel = $("categoriaSelector");
+        sel.innerHTML = "";
+        CATEGORIAS.forEach(cat => {
+            const opt = document.createElement("option");
+            opt.value = cat;
+            opt.textContent = cat;
+            if (cat === currentCategoria) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.onchange = () => {
+            currentCategoria = sel.value;
+            applyClubTheme();
+            goHome();
+        };
+    }
+
     function applyClubTheme() {
         const c = CLUBS[currentClub];
         document.documentElement.style.setProperty("--club-accent", c.accent);
         document.documentElement.style.setProperty("--club-dark", c.accentDark);
-        $("clubNameLabel").textContent = c.name;
+        $("clubNameLabel").textContent = `${c.name} · ${currentCategoria}`;
     }
 
     // ========== NAVEGACIÓN ==========
@@ -147,7 +177,7 @@
     // Exponer lo necesario a otros bloques <script> del archivo
     window.__cv = { db, auth, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where, setDoc, getDoc,
         jugadorasCol, asistenciasCol, partidosCol,
-        getCurrentClub: () => currentClub, getCurrentUser: () => currentUser };
+        getCurrentClub: () => currentClub, getCurrentCategoria: () => currentCategoria, getCurrentUser: () => currentUser };
 </script>
 
 <style>
@@ -167,6 +197,7 @@
     .logo { font-weight:700; font-size:1.2rem; cursor:pointer; }
     .header-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
     select#clubSelector { background:var(--club-accent); color:white; border:none; padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; }
+    select#categoriaSelector { background:rgba(255,255,255,0.15); color:white; border:1px solid rgba(255,255,255,0.4); padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; }
     .logout-btn { background:#DC2626; border:none; color:white; padding:6px 12px; border-radius:20px; cursor:pointer; font-size:0.75rem; }
     .view { display:none; }
     .home-tiles { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:20px; }
@@ -226,6 +257,11 @@
 </style>
 </head>
 <body>
+<div id="installBanner" style="display:none; position:fixed; bottom:0; left:0; right:0; background:#1B2A4A; color:white; padding:14px 16px; font-size:0.78rem; z-index:999; align-items:center; gap:10px; box-shadow:0 -4px 12px rgba(0,0,0,0.2);">
+    <span id="installBannerText" style="flex:1;"></span>
+    <button id="installBannerBtn" style="display:none; background:#D8402F; color:white; border:none; padding:8px 14px; border-radius:20px; font-size:0.75rem; white-space:nowrap; cursor:pointer;">Instalar</button>
+    <button id="installBannerClose" style="background:none; border:none; color:white; font-size:1.1rem; cursor:pointer; padding:0 4px;">✕</button>
+</div>
 
 <div id="authSection">
 <div class="auth-container">
@@ -257,6 +293,7 @@
                 <div class="logo" onclick="goHome()">🏐 Carmen's Voley</div>
                 <div class="header-actions">
                     <select id="clubSelector" style="display:none;"></select>
+                    <select id="categoriaSelector"></select>
                     <span id="userEmail" style="font-size:0.7rem;"></span>
                     <button id="logoutBtn" class="logout-btn">🚪 Salir</button>
                 </div>
@@ -348,8 +385,8 @@
                         <div class="campo">
                             <label>🏷️ Categoría</label>
                             <select id="playerCategory">
-                                <option>Alevín</option><option selected>Infantil</option>
-                                <option>Cadete</option><option>Juvenil</option><option>Senior</option>
+                                <option>Prebenjamín</option><option>Benjamín</option><option>Alevín</option>
+                                <option selected>Infantil</option><option>Cadete</option><option>Juvenil</option><option>Senior</option>
                             </select>
                         </div>
                     </div>
@@ -525,7 +562,7 @@
 </script>
 
 <script type="module">
-    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, getCurrentClub, getCurrentUser } = window.__cv;
+    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, getCurrentClub, getCurrentCategoria, getCurrentUser } = window.__cv;
     const $ = (id) => document.getElementById(id);
 
     let allPlayers = [];
@@ -546,7 +583,8 @@
         const q = query(jugadorasCol(), orderBy("createdAt", "desc"));
         const snapshot = await getDocs(q);
         allPlayers = [];
-        snapshot.forEach(d => allPlayers.push({ id: d.id, ...d.data() }));
+        const categoria = getCurrentCategoria();
+        snapshot.forEach(d => { const data = d.data(); if ((data.category || "") === categoria) allPlayers.push({ id: d.id, ...data }); });
         mostrarListaScout();
         renderPlayers();
     };
@@ -612,7 +650,7 @@
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Captaciones");
-        XLSX.writeFile(wb, `captaciones_${getCurrentClub()}_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.writeFile(wb, `captaciones_${getCurrentClub()}_${getCurrentCategoria()}_${new Date().toISOString().slice(0,10)}.xlsx`);
     });
 
     let esPlantillaActual = false;
@@ -631,7 +669,7 @@
         setPlantillaToggle(false);
         $("playerCurso").value = ""; $("playerNumero").value = ""; $("playerFechaNac").value = ""; $("playerDni").value = "";
         $("playerBirthYear").value = "2012";
-        $("playerCategory").value = "Infantil";
+        $("playerCategory").value = getCurrentCategoria();
         $("playerTeam").value = "";
         document.querySelectorAll("#positionChips .chip").forEach(c => c.classList.remove("selected"));
         $("playerSalto").value = "";
@@ -760,7 +798,7 @@
 </script>
 
 <script type="module">
-    const { addDoc, getDocs, query, orderBy, where, deleteDoc, doc, setDoc, getDoc, jugadorasCol, asistenciasCol, partidosCol, getCurrentClub } = window.__cv;
+    const { addDoc, getDocs, query, orderBy, where, deleteDoc, doc, setDoc, getDoc, jugadorasCol, asistenciasCol, partidosCol, getCurrentClub, getCurrentCategoria } = window.__cv;
     const $ = (id) => document.getElementById(id);
 
     const MOTIVOS = [
@@ -779,7 +817,7 @@
     window.loadAsistView = async function loadAsistView() {
         const snap = await getDocs(query(jugadorasCol(), orderBy("name")));
         plantilla = [];
-        snap.forEach(d => { const data = d.data(); if (data.esPlantilla) plantilla.push({ id: d.id, ...data }); });
+        snap.forEach(d => { const data = d.data(); if (data.esPlantilla && (data.category || "") === getCurrentCategoria()) plantilla.push({ id: d.id, ...data }); });
         if (!$("asistFecha").value) $("asistFecha").value = new Date().toISOString().slice(0, 10);
         renderPlantillaList();
         await cargarAsistenciaDelDia();
@@ -865,6 +903,7 @@
         const snap = await getDocs(q);
         snap.forEach(d => {
             const data = d.data();
+            if ((data.categoria || "") !== getCurrentCategoria()) return;
             (data.registros || []).forEach(r => { if (r.estado === "falta") asistEstados[r.jugadoraId] = { motivo: r.motivo, nota: r.nota || "" }; });
         });
         renderAsistTable();
@@ -879,7 +918,9 @@
                 ? { jugadoraId: j.id, nombre: j.name, estado: "falta", motivo: f.motivo, nota: f.nota || "" }
                 : { jugadoraId: j.id, nombre: j.name, estado: "presente" };
         });
-        await setDoc(doc(asistenciasCol(), fecha), { fecha, registros, updatedAt: new Date() });
+        // El id del documento incluye la categoría para no pisar la asistencia
+        // de otro equipo del mismo club en la misma fecha.
+        await setDoc(doc(asistenciasCol(), `${fecha}_${getCurrentCategoria()}`), { fecha, categoria: getCurrentCategoria(), registros, updatedAt: new Date() });
         alert("✅ Asistencia guardada");
     });
 
@@ -904,7 +945,7 @@
         const ws = XLSX.utils.json_to_sheet(filas);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, fecha);
-        XLSX.writeFile(wb, `asistencia_${getCurrentClub()}_sesion_${fecha}.xlsx`);
+        XLSX.writeFile(wb, `asistencia_${getCurrentClub()}_${getCurrentCategoria()}_sesion_${fecha}.xlsx`);
     });
 
     // Exportar tabla acumulada completa en el rango elegido, en el mismo
@@ -915,14 +956,17 @@
         if (!desde || !hasta) { alert("Elige un rango de fechas"); return; }
         const snapAsist = await getDocs(asistenciasCol());
         const sesiones = [];
+        const categoria = getCurrentCategoria();
         snapAsist.forEach(d => {
             const data = d.data();
+            if ((data.categoria || "") !== categoria) return;
             if (data.fecha < desde || data.fecha > hasta) return;
             sesiones.push({ tipo: "entreno", fecha: data.fecha, data });
         });
         const snapPartidos = await getDocs(partidosCol());
         snapPartidos.forEach(d => {
             const data = d.data();
+            if ((data.categoria || "") !== categoria) return;
             if (!data.fecha || data.fecha < desde || data.fecha > hasta) return;
             sesiones.push({ tipo: "partido", fecha: data.fecha, data });
         });
@@ -958,12 +1002,12 @@
         const ws = XLSX.utils.json_to_sheet(filas);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
-        XLSX.writeFile(wb, `asistencia_${getCurrentClub()}_${desde}_${hasta}.xlsx`);
+        XLSX.writeFile(wb, `asistencia_${getCurrentClub()}_${getCurrentCategoria()}_${desde}_${hasta}.xlsx`);
     });
 </script>
 
 <script type="module">
-    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, partidosCol, getCurrentUser } = window.__cv;
+    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, partidosCol, getCurrentCategoria, getCurrentUser } = window.__cv;
     const $ = (id) => document.getElementById(id);
 
     let plantillaPartido = [];
@@ -976,7 +1020,7 @@
     window.loadPartidoView = async function loadPartidoView() {
         const snap = await getDocs(query(jugadorasCol(), orderBy("name")));
         plantillaPartido = [];
-        snap.forEach(d => { const data = d.data(); if (data.esPlantilla) plantillaPartido.push({ id: d.id, ...data }); });
+        snap.forEach(d => { const data = d.data(); if (data.esPlantilla && (data.category || "") === getCurrentCategoria()) plantillaPartido.push({ id: d.id, ...data }); });
         mostrarListaPartidos();
         await loadPartidosLista();
     };
@@ -993,7 +1037,8 @@
     async function loadPartidosLista() {
         const snap = await getDocs(query(partidosCol(), orderBy("fecha", "desc")));
         partidos = [];
-        snap.forEach(d => partidos.push({ id: d.id, ...d.data() }));
+        const categoria = getCurrentCategoria();
+        snap.forEach(d => { const data = d.data(); if ((data.categoria || "") === categoria) partidos.push({ id: d.id, ...data }); });
         const cont = $("partidosLista");
         cont.innerHTML = "";
         partidos.forEach(p => {
@@ -1172,7 +1217,7 @@
 
         const partidoData = {
             fecha: $("partidoFecha").value, rival: $("partidoRival").value, torneo: $("partidoTorneo").value,
-            convocatoria: convocatoriaCompleta, sexteto: sextetoSeleccionado, sets, cambios,
+            categoria: getCurrentCategoria(), convocatoria: convocatoriaCompleta, sexteto: sextetoSeleccionado, sets, cambios,
             updatedAt: new Date(), createdBy: user.uid
         };
         if (editandoPartidoId) {
@@ -1186,5 +1231,50 @@
     });
 </script>
 
+<script>
+    (function() {
+        try {
+            const banner = document.getElementById("installBanner");
+            const text = document.getElementById("installBannerText");
+            const btn = document.getElementById("installBannerBtn");
+            const closeBtn = document.getElementById("installBannerClose");
+            const DISMISS_KEY = "cv_install_dismissed";
+
+            const isStandalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+            if (isStandalone) return;
+            let dismissed = false;
+            try { dismissed = !!localStorage.getItem(DISMISS_KEY); } catch (e) {}
+            if (dismissed) return;
+
+            const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+            let deferredPrompt = null;
+
+            if (isIOS) {
+                text.textContent = 'Instala esta app: toca Compartir ⬆️ y luego "Añadir a pantalla de inicio"';
+                banner.style.display = "flex";
+            } else {
+                window.addEventListener("beforeinstallprompt", (e) => {
+                    e.preventDefault();
+                    deferredPrompt = e;
+                    text.textContent = "Instala esta app en tu móvil para acceder más rápido";
+                    btn.style.display = "inline-block";
+                    banner.style.display = "flex";
+                });
+                btn.addEventListener("click", async () => {
+                    if (!deferredPrompt) return;
+                    deferredPrompt.prompt();
+                    await deferredPrompt.userChoice;
+                    deferredPrompt = null;
+                    banner.style.display = "none";
+                });
+            }
+
+            closeBtn.addEventListener("click", () => {
+                banner.style.display = "none";
+                try { localStorage.setItem(DISMISS_KEY, "1"); } catch (e) {}
+            });
+        } catch (e) { console.error("install banner error:", e); }
+    })();
+</script>
 </body>
 </html>
