@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Carmen's Voley</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js" defer></script>
+<script type="module">
+    // ============================================================
+    // 🔥 PEGA AQUÍ TU CONFIGURACIÓN DE FIREBASE
+    // ============================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDp5A_EoER8zjSuDPmvRTZ1V-4lTN8yiss",
+        authDomain: "carmensvoley.firebaseapp.com",
+        projectId: "carmensvoley",
+        storageBucket: "carmensvoley.firebasestorage.app",
+        messagingSenderId: "602798221331",
+        appId: "1:602798221331:web:a36ff03caf8ac2a0da37e6"
+    };
+    // ============================================================
+
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // ========== CLUBES ==========
+    const CLUBS = {
+        buenpastor: { name: "Buen Pastor", accent: "#1E40AF", accentDark: "#0C447C" },
+        tomares:    { name: "Voleibol Tomares", accent: "#D8402F", accentDark: "#1B2A4A" }
+    };
+    let currentClub = "tomares";
+    let currentUserDoc = null; // { role: 'admin'|'coach', clubs: ['buenpastor','tomares'] }
+    let currentUser = null;
+
+    const jugadorasCol = () => collection(db, "clubes", currentClub, "jugadoras");
+    const asistenciasCol = () => collection(db, "clubes", currentClub, "asistencias");
+    const partidosCol = () => collection(db, "clubes", currentClub, "partidos");
+
+    // ========== DOM ==========
+    const $ = (id) => document.getElementById(id);
+    const authSection = $("authSection");
+    const appSection = $("appSection");
+
+    // ========== AUTENTICACIÓN ==========
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            currentUser = user;
+            const udocSnap = await getDoc(doc(db, "usuarios", user.uid));
+            if (udocSnap.exists()) {
+                currentUserDoc = udocSnap.data();
+            } else {
+                // Usuario nuevo sin perfil: rol coach sin clubes asignados por defecto.
+                // Un admin debe asignarle club/rol manualmente en Firestore.
+                currentUserDoc = { role: "coach", clubs: [] };
+                await setDoc(doc(db, "usuarios", user.uid), currentUserDoc);
+            }
+            const clubesPermitidos = currentUserDoc.role === "admin" ? Object.keys(CLUBS) : (currentUserDoc.clubs || []);
+            if (clubesPermitidos.length === 0) {
+                alert("Tu cuenta todavía no tiene ningún club asignado. Contacta con el administrador.");
+                await signOut(auth);
+                return;
+            }
+            if (!clubesPermitidos.includes(currentClub)) currentClub = clubesPermitidos[0];
+            authSection.style.display = "none";
+            appSection.style.display = "block";
+            $("userEmail").textContent = user.email;
+            renderClubSelector(clubesPermitidos);
+            applyClubTheme();
+            goHome();
+        } else {
+            currentUser = null;
+            currentUserDoc = null;
+            authSection.style.display = "flex";
+            appSection.style.display = "none";
+        }
+    });
+
+    $("loginBtn").addEventListener("click", async () => {
+        try {
+            await signInWithEmailAndPassword(auth, $("loginEmail").value, $("loginPassword").value);
+        } catch (error) {
+            alert("❌ Error: " + error.message);
+        }
+    });
+    $("registerBtn").addEventListener("click", async () => {
+        try {
+            await createUserWithEmailAndPassword(auth, $("registerEmail").value, $("registerPassword").value);
+            alert("✅ Cuenta creada. Un admin debe asignarte club y rol antes de poder usar la app.");
+        } catch (error) {
+            alert("❌ Error: " + error.message);
+        }
+    });
+    $("logoutBtn").addEventListener("click", async () => { await signOut(auth); });
+
+    // ========== SELECTOR DE CLUB ==========
+    function renderClubSelector(clubesPermitidos) {
+        const sel = $("clubSelector");
+        sel.innerHTML = "";
+        if (clubesPermitidos.length <= 1) {
+            sel.style.display = "none";
+            return;
+        }
+        sel.style.display = "inline-block";
+        clubesPermitidos.forEach(cid => {
+            const opt = document.createElement("option");
+            opt.value = cid;
+            opt.textContent = CLUBS[cid].name;
+            if (cid === currentClub) opt.selected = true;
+            sel.appendChild(opt);
+        });
+        sel.onchange = () => {
+            currentClub = sel.value;
+            applyClubTheme();
+            goHome();
+        };
+    }
+
+    function applyClubTheme() {
+        const c = CLUBS[currentClub];
+        document.documentElement.style.setProperty("--club-accent", c.accent);
+        document.documentElement.style.setProperty("--club-dark", c.accentDark);
+        $("clubNameLabel").textContent = c.name;
+    }
+
+    // ========== NAVEGACIÓN ==========
+    function goHome() {
+        showView("homeView");
+    }
+    function showView(id) {
+        document.querySelectorAll(".view").forEach(v => v.style.display = "none");
+        $(id).style.display = "block";
+        if (id === "scoutView") loadJugadoras();
+        if (id === "asistView") loadAsistView();
+        if (id === "partidoView") loadPartidoView();
+    }
+    window.showView = showView;
+    window.goHome = goHome;
+
+    document.querySelectorAll(".home-tile").forEach(tile => {
+        tile.addEventListener("click", () => showView(tile.dataset.target));
+    });
+
+    // Exponer lo necesario a otros bloques <script> del archivo
+    window.__cv = { db, auth, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where, setDoc, getDoc,
+        jugadorasCol, asistenciasCol, partidosCol,
+        getCurrentClub: () => currentClub, getCurrentUser: () => currentUser };
+</script>
+
+<style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    :root { --club-accent:#D8402F; --club-dark:#1B2A4A; }
+    body { background:#F1F5F9; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding:16px; min-height:100vh; }
+    .app, .auth-container { max-width:650px; margin:0 auto; background:#F8FAFC; border-radius:32px; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.08); }
+    .auth-container { background:white; padding:32px 24px; }
+    .auth-tabs { display:flex; gap:16px; margin-bottom:24px; border-bottom:2px solid #E2E8F0; }
+    .auth-tab { padding:12px 0; font-weight:600; color:#64748B; cursor:pointer; }
+    .auth-tab.active { color:var(--club-dark); border-bottom:2px solid var(--club-dark); margin-bottom:-2px; }
+    .auth-form { display:flex; flex-direction:column; gap:16px; }
+    .auth-form input { padding:14px; border-radius:20px; border:1px solid #E2E8F0; }
+    .auth-form button { background:var(--club-accent); color:white; border:none; padding:14px; border-radius:44px; font-weight:bold; }
+    .header { background:var(--club-dark); color:white; padding:20px; }
+    .header-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:12px; }
+    .logo { font-weight:700; font-size:1.2rem; cursor:pointer; }
+    .header-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    select#clubSelector { background:var(--club-accent); color:white; border:none; padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; }
+    .logout-btn { background:#DC2626; border:none; color:white; padding:6px 12px; border-radius:20px; cursor:pointer; font-size:0.75rem; }
+    .view { display:none; }
+    .home-tiles { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:20px; }
+    .home-tile { background:white; border:1px solid #E2E8F0; border-radius:20px; padding:24px 12px; text-align:center; cursor:pointer; }
+    .home-tile:last-child { grid-column:1/3; }
+    .home-tile .tile-icon { font-size:1.8rem; }
+    .home-tile .tile-label { font-weight:600; margin-top:8px; font-size:0.9rem; color:#1E293B; }
+    .btn-primary { background:var(--club-accent); color:white; border:none; padding:14px; border-radius:44px; font-weight:bold; width:100%; }
+    .btn-secondary { background:white; color:var(--club-dark); border:1px solid var(--club-dark); padding:14px; border-radius:44px; font-weight:bold; width:100%; }
+    .back-bar { padding:16px 20px 0; }
+    .back-btn { background:none; border:none; color:var(--club-dark); font-weight:600; cursor:pointer; font-size:0.85rem; }
+    .campo { margin-bottom:20px; padding:0 20px; }
+    label { font-weight:600; font-size:0.8rem; color:#475569; display:block; margin-bottom:8px; }
+    input, select, textarea { width:100%; padding:12px; border-radius:20px; border:1px solid #E2E8F0; background:#F8FAFC; }
+    .doble { display:flex; gap:12px; padding:0 20px; }
+    .doble .campo { flex:1; padding:0; }
+    .chip-group { display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+    .chip { background:#F1F5F9; padding:8px 16px; border-radius:40px; font-size:0.75rem; cursor:pointer; border:1px solid #E2E8F0; }
+    .chip.selected { background:var(--club-accent); color:white; }
+    .radio-group { display:flex; gap:20px; flex-wrap:wrap; }
+    .radio-group label { display:flex; align-items:center; gap:6px; font-weight:normal; }
+    .slider-wrapper { display:flex; align-items:center; gap:16px; }
+    .slider-value { background:var(--club-accent); color:white; padding:6px 14px; border-radius:40px; min-width:55px; text-align:center; }
+    input[type="file"] { display:none; }
+    .botones-foto { display:flex; gap:12px; margin-top:8px; }
+    .btn-foto { flex:1; background:#F1F5F9; padding:10px; border-radius:40px; text-align:center; cursor:pointer; border:1px solid #E2E8F0; }
+    .foto-preview { background:#F8FAFC; border-radius:20px; padding:16px; text-align:center; border:1px dashed #CBD5E1; }
+    .lista-container { padding:20px; }
+    .player-card { background:white; border-radius:20px; padding:14px; margin-bottom:12px; display:flex; gap:12px; border:1px solid #E2E8F0; }
+    .player-avatar { width:52px; height:52px; background:#F1F5F9; border-radius:28px; display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; }
+    .player-info { flex:1; }
+    .player-name { font-weight:700; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+    .player-rating { background:#FEF3C7; padding:2px 10px; border-radius:30px; font-size:0.7rem; }
+    .player-rating.hidden { background:#E2E8F0; color:#64748B; }
+    .player-details { font-size:0.7rem; color:#64748B; margin-top:6px; }
+    .player-notes { font-size:0.7rem; color:#475569; margin-top:6px; font-style:italic; }
+    .player-actions { display:flex; flex-direction:column; gap:8px; }
+    .edit-btn, .delete-btn { background:none; border:none; font-size:1.2rem; cursor:pointer; padding:4px; }
+    .fab { position:fixed; bottom:24px; right:24px; background:var(--club-accent); width:56px; height:56px; border-radius:28px; display:flex; align-items:center; justify-content:center; font-size:28px; color:white; box-shadow:0 4px 12px rgba(0,0,0,0.3); cursor:pointer; border:none; z-index:50; }
+    .toggle-switch { width:48px; height:24px; background:#64748B; border-radius:30px; position:relative; cursor:pointer; }
+    .toggle-switch.active { background:#3B82F6; }
+    .toggle-switch::after { content:''; width:20px; height:20px; background:white; border-radius:50%; position:absolute; top:2px; left:3px; transition:left 0.2s; }
+    .toggle-switch.active::after { left:25px; }
+    .toggle-container { display:flex; justify-content:flex-end; align-items:center; gap:12px; margin-top:8px; }
+    .buscador { padding:16px 20px; background:white; border-bottom:1px solid #E2E8F0; }
+    .buscador input { border-radius:44px; }
+    table.asist-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+    table.asist-table th, table.asist-table td { padding:8px; border-bottom:1px solid #E2E8F0; text-align:left; }
+    .estado-btn { padding:4px 10px; border-radius:20px; border:1px solid #E2E8F0; background:white; font-size:0.7rem; cursor:pointer; margin-right:4px; }
+    .estado-btn.selected-presente { background:#639922; color:white; border-color:#639922; }
+    .estado-btn.selected-ausente { background:#E24B4A; color:white; border-color:#E24B4A; }
+    .estado-btn.selected-justificada { background:#EF9F27; color:white; border-color:#EF9F27; }
+    .set-row { display:flex; gap:8px; align-items:center; padding:0 20px; margin-bottom:10px; }
+    .set-row input { text-align:center; }
+    #appSection { display:none; }
+    #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; }
+</style>
+</head>
+<body>
+
+<div id="authSection">
+<div class="auth-container">
+    <div style="text-align:center; margin-bottom:24px;">
+        <h2>🏐 Carmen's Voley</h2>
+        <p style="color:#64748B;">Accede con tu cuenta</p>
+    </div>
+    <div class="auth-tabs">
+        <div class="auth-tab active" data-tab="login">Iniciar sesión</div>
+        <div class="auth-tab" data-tab="register">Registrarse</div>
+    </div>
+    <div id="loginForm" class="auth-form">
+        <input type="email" id="loginEmail" placeholder="Email" autocomplete="email">
+        <input type="password" id="loginPassword" placeholder="Contraseña">
+        <button id="loginBtn">Iniciar sesión</button>
+    </div>
+    <div id="registerForm" class="auth-form" style="display:none;">
+        <input type="email" id="registerEmail" placeholder="Email">
+        <input type="password" id="registerPassword" placeholder="Contraseña (mínimo 6 caracteres)">
+        <button id="registerBtn">Registrarse</button>
+    </div>
+</div>
+</div>
+
+<div id="appSection">
+    <div class="app">
+        <div class="header">
+            <div class="header-top">
+                <div class="logo" onclick="goHome()">🏐 Carmen's Voley</div>
+                <div class="header-actions">
+                    <select id="clubSelector" style="display:none;"></select>
+                    <span id="userEmail" style="font-size:0.7rem;"></span>
+                    <button id="logoutBtn" class="logout-btn">🚪 Salir</button>
+                </div>
+            </div>
+            <div style="font-size:0.75rem; opacity:0.85;" id="clubNameLabel"></div>
+        </div>
+
+        <!-- HOME -->
+        <div id="homeView" class="view" style="display:block;">
+            <div class="home-tiles">
+                <div class="home-tile" data-target="scoutView">
+                    <div class="tile-icon">🔎</div>
+                    <div class="tile-label">Scout</div>
+                </div>
+                <div class="home-tile" data-target="asistView">
+                    <div class="tile-icon">📋</div>
+                    <div class="tile-label">Asistencia</div>
+                </div>
+                <div class="home-tile" data-target="partidoView">
+                    <div class="tile-icon">🏐</div>
+                    <div class="tile-label">Partido</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCOUT VIEW -->
+        <div id="scoutView" class="view">
+            <div class="back-bar"><button class="back-btn" onclick="goHome()">← Volver</button></div>
+
+            <div id="scoutListaCont">
+                <div class="toggle-container" style="padding:0 20px;">
+                    <span class="toggle-label" id="toggleRatingsLabel">👁️ Mostrar valoraciones</span>
+                    <div class="toggle-switch active" id="toggleRatings"></div>
+                </div>
+                <div class="buscador">
+                    <input type="text" id="searchInput" placeholder="🔍 Buscar por nombre, equipo, posición...">
+                    <button id="exportBtn" class="btn-secondary" style="margin-top:10px;">📊 Exportar Excel</button>
+                </div>
+                <div class="lista-container">
+                    <h4 style="margin-bottom:12px;">📋 Jugadoras captadas</h4>
+                    <div id="playersList"></div>
+                </div>
+                <button id="newPlayerBtn" class="fab">➕</button>
+            </div>
+
+            <div id="scoutFormCont" style="display:none;">
+                <div class="formulario" id="formContainer" style="padding:20px 0;">
+                    <h3 id="formTitle" style="padding:0 20px;">➕ Nueva jugadora</h3>
+                    <input type="hidden" id="playerId">
+
+                    <div class="campo">
+                        <label>📸 Foto</label>
+                        <div class="foto-preview" id="photoPreview">👤</div>
+                        <div id="photoText" style="font-size:0.7rem; text-align:center; margin-top:4px;">Sin foto</div>
+                        <div class="botones-foto">
+                            <div class="btn-foto" id="cameraBtn">📷 Cámara</div>
+                            <div class="btn-foto" id="galleryBtn">🖼️ Galería</div>
+                        </div>
+                        <input type="file" id="cameraInput" accept="image/*" capture="environment">
+                        <input type="file" id="galleryInput" accept="image/*">
+                    </div>
+
+                    <div class="campo">
+                        <label>👤 Nombre completo</label>
+                        <input type="text" id="playerName" placeholder="Ej: Marta Ruiz">
+                    </div>
+
+                    <div class="campo" style="display:flex; align-items:center; justify-content:space-between;">
+                        <label style="margin:0;">🏐 Es jugadora de nuestra plantilla (Buen Pastor / Tomares)</label>
+                        <div class="toggle-switch" id="togglePlantilla"></div>
+                    </div>
+
+                    <div id="camposPlantilla" style="display:none;">
+                        <div class="doble">
+                            <div class="campo"><input type="text" id="playerCurso" placeholder="Curso (ej. 21B)"></div>
+                            <div class="campo"><input type="text" id="playerNumero" placeholder="Número"></div>
+                        </div>
+                        <div class="doble">
+                            <div class="campo"><input type="date" id="playerFechaNac" placeholder="Fecha nacimiento"></div>
+                            <div class="campo"><input type="text" id="playerDni" placeholder="DNI"></div>
+                        </div>
+                    </div>
+
+                    <div class="doble">
+                        <div class="campo">
+                            <label>📅 Año nacimiento</label>
+                            <select id="playerBirthYear"></select>
+                        </div>
+                        <div class="campo">
+                            <label>🏷️ Categoría</label>
+                            <select id="playerCategory">
+                                <option>Alevín</option><option selected>Infantil</option>
+                                <option>Cadete</option><option>Juvenil</option><option>Senior</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="campo">
+                        <label>🏐 Equipo procedencia</label>
+                        <input type="text" id="playerTeam" placeholder="Ej: Buen Pastor, Tomares...">
+                    </div>
+
+                    <div class="campo">
+                        <label>🎯 Posición</label>
+                        <div class="chip-group" id="positionChips">
+                            <span class="chip" data-pos="Colocadora">Colocadora</span>
+                            <span class="chip" data-pos="Central">Central</span>
+                            <span class="chip" data-pos="Opuesta">Opuesta</span>
+                            <span class="chip" data-pos="Receptora">Receptora</span>
+                            <span class="chip" data-pos="Líbero">Líbero</span>
+                        </div>
+                    </div>
+
+                    <div class="doble">
+                        <div class="campo">
+                            <label>⬆️ Salto (cm)</label>
+                            <input type="number" id="playerSalto" placeholder="Ej: 220" min="100" max="350">
+                        </div>
+                        <div class="campo">
+                            <label>✋ Mano dominante</label>
+                            <div class="radio-group" style="margin-top:12px;">
+                                <label><input type="radio" name="mano" value="derecha" checked> Derecha</label>
+                                <label><input type="radio" name="mano" value="izquierda"> Izquierda</label>
+                                <label><input type="radio" name="mano" value="ambidiestra"> Ambas</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="campo">
+                        <label>⭐ Valoración (1-10)</label>
+                        <div class="slider-wrapper">
+                            <input type="range" id="playerRating" min="1" max="10" step="0.5" value="7.5">
+                            <span class="slider-value" id="ratingValue">7.5</span>
+                        </div>
+                    </div>
+
+                    <div class="campo">
+                        <label>📝 Observaciones</label>
+                        <textarea id="playerObservations" rows="3" placeholder="Ataque, bloqueo, actitud..."></textarea>
+                    </div>
+
+                    <div class="campo">
+                        <button id="saveBtn" class="btn-primary">💾 Guardar</button>
+                        <div style="height:8px;"></div>
+                        <button id="cancelEditBtn" class="btn-secondary">❌ Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ASISTENCIA VIEW -->
+        <div id="asistView" class="view">
+            <div class="back-bar"><button class="back-btn" onclick="goHome()">← Volver</button></div>
+
+            <div class="campo">
+                <label>👥 Plantilla del equipo</label>
+                <p style="font-size:0.7rem; color:#64748B; margin-bottom:8px;">Se gestiona desde Scout (activa "Es de nuestra plantilla" en cada jugadora). Aquí solo se muestra para pasar lista.</p>
+                <div id="plantillaList" style="margin-top:4px;"></div>
+                <button id="irAScoutBtn" class="btn-secondary" style="margin-top:8px;">➕ Añadir jugadora en Scout</button>
+            </div>
+
+            <div class="campo">
+                <label>📅 Fecha de la sesión</label>
+                <input type="date" id="asistFecha">
+            </div>
+
+            <div class="campo">
+                <p style="font-size:0.7rem; color:#64748B; margin-bottom:8px;">Por defecto todas presentes. Toca "Marcar falta" solo en quien falte.</p>
+                <div id="asistTableBody"></div>
+            </div>
+
+            <div class="campo">
+                <button id="guardarAsistBtn" class="btn-primary">💾 Guardar asistencia del día</button>
+            </div>
+
+            <div class="campo">
+                <label>📊 Exportar Excel de asistencia</label>
+                <button id="exportSemanaBtn" class="btn-secondary">📥 Exportar semana actual (para pegar en el Drive)</button>
+                <div style="height:8px;"></div>
+                <div class="doble" style="padding:0;">
+                    <div class="campo" style="padding:0;"><input type="date" id="exportDesde"></div>
+                    <div class="campo" style="padding:0;"><input type="date" id="exportHasta"></div>
+                </div>
+                <button id="exportHistoricoBtn" class="btn-secondary" style="margin-top:10px;">📥 Exportar histórico completo (rango de fechas)</button>
+                <p style="font-size:0.7rem; color:#64748B; margin-top:8px;">Formato basado en la plantilla del colegio (hoja INFANTIL) — una columna por sesión, Curso/DNI/Número por jugadora. Ajustamos detalles cuando confirmes si el Drive usa un .xlsx o una Hoja de cálculo de Google.</p>
+            </div>
+        </div>
+
+        <!-- PARTIDO VIEW -->
+        <div id="partidoView" class="view">
+            <div class="back-bar"><button class="back-btn" onclick="goHome()">← Volver</button></div>
+
+            <div id="partidoListaCont">
+                <div class="campo">
+                    <button id="nuevoPartidoBtn" class="btn-primary">➕ Crear partido</button>
+                </div>
+                <div class="lista-container" id="partidosLista" style="padding-top:0;"></div>
+            </div>
+
+            <div id="partidoFormCont" style="display:none;">
+                <input type="hidden" id="partidoId">
+                <div class="doble">
+                    <div class="campo"><label>📅 Fecha</label><input type="date" id="partidoFecha"></div>
+                    <div class="campo"><label>🏟️ Rival</label><input type="text" id="partidoRival" placeholder="Equipo rival"></div>
+                </div>
+                <div class="campo">
+                    <label>🏆 Competición</label>
+                    <input type="text" id="partidoTorneo" value="Torneo IMD Sevilla · Infantil">
+                </div>
+
+                <div class="campo">
+                    <label>📋 Convocatoria (de la plantilla)</label>
+                    <p style="font-size:0.7rem; color:#64748B; margin-bottom:8px;">Por defecto no convocada (NC). Marca C en quien convoques; si convocada no viene, márcala F.</p>
+                    <div id="convocatoriaList"></div>
+                </div>
+
+                <div class="campo">
+                    <label>🧑‍🤝‍🧑 Sexteto inicial + líbero</label>
+                    <div id="sextetoChips" class="chip-group"></div>
+                    <p style="font-size:0.7rem; color:#64748B; margin-top:6px;">Solo puedes elegir entre las convocadas (C). Selecciona 6 titulares + líbero (7 en total).</p>
+                </div>
+
+                <div class="campo">
+                    <label>🎯 Resultado por sets (mejor de 3)</label>
+                    <div class="set-row"><span style="width:56px;">Set 1</span><input type="number" id="set1local" placeholder="Local" min="0"><span>-</span><input type="number" id="set1rival" placeholder="Rival" min="0"></div>
+                    <div class="set-row"><span style="width:56px;">Set 2</span><input type="number" id="set2local" placeholder="Local" min="0"><span>-</span><input type="number" id="set2rival" placeholder="Rival" min="0"></div>
+                    <div class="set-row"><span style="width:56px;">Set 3</span><input type="number" id="set3local" placeholder="Local" min="0"><span>-</span><input type="number" id="set3rival" placeholder="Rival" min="0"></div>
+                </div>
+
+                <div class="campo">
+                    <label>🔄 Cambios durante el partido</label>
+                    <div id="cambiosList"></div>
+                    <div style="display:flex; gap:8px; margin-top:8px;">
+                        <select id="cambioSale" style="flex:1;"></select>
+                        <select id="cambioEntra" style="flex:1;"></select>
+                        <button id="addCambioBtn" class="btn-secondary" style="width:auto; padding:10px 14px;">➕</button>
+                    </div>
+                    <p style="font-size:0.7rem; color:#64748B; margin-top:6px;">Sale/entra solo entre convocadas (C).</p>
+                </div>
+
+
+                <div class="campo">
+                    <button id="guardarPartidoBtn" class="btn-primary">💾 Guardar partido</button>
+                    <div style="height:8px;"></div>
+                    <button id="cancelarPartidoBtn" class="btn-secondary">❌ Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tabs auth
+    const tabLogin = document.querySelector('[data-tab="login"]');
+    const tabRegister = document.querySelector('[data-tab="register"]');
+    tabLogin.addEventListener('click', () => {
+        tabLogin.classList.add('active'); tabRegister.classList.remove('active');
+        document.getElementById('loginForm').style.display = 'flex';
+        document.getElementById('registerForm').style.display = 'none';
+    });
+    tabRegister.addEventListener('click', () => {
+        tabRegister.classList.add('active'); tabLogin.classList.remove('active');
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('registerForm').style.display = 'flex';
+    });
+</script>
+
+<script type="module">
+    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, getCurrentClub, getCurrentUser } = window.__cv;
+    const $ = (id) => document.getElementById(id);
+
+    let allPlayers = [];
+    let ratingsVisible = true;
+    let currentEditId = null;
+    let currentPhotoURL = null;
+
+    function mostrarListaScout() {
+        $("scoutListaCont").style.display = "block";
+        $("scoutFormCont").style.display = "none";
+    }
+    function mostrarFormScout() {
+        $("scoutListaCont").style.display = "none";
+        $("scoutFormCont").style.display = "block";
+    }
+
+    window.loadJugadoras = async function loadJugadoras() {
+        const q = query(jugadorasCol(), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        allPlayers = [];
+        snapshot.forEach(d => allPlayers.push({ id: d.id, ...d.data() }));
+        mostrarListaScout();
+        renderPlayers();
+    };
+
+    function renderPlayers() {
+        const term = $("searchInput").value.toLowerCase();
+        const filtered = allPlayers.filter(p =>
+            p.name?.toLowerCase().includes(term) ||
+            p.team?.toLowerCase().includes(term) ||
+            p.position?.toLowerCase().includes(term)
+        );
+        const list = $("playersList");
+        list.innerHTML = "";
+        filtered.forEach(player => {
+            const ratingHtml = ratingsVisible
+                ? `<span class="player-rating">⭐ ${player.rating || 5}</span>`
+                : `<span class="player-rating hidden">🔒 Confidencial</span>`;
+            const plantillaHtml = player.esPlantilla ? `<span class="player-rating" style="background:#DCFCE7; color:#166534;">🏐 Plantilla</span>` : "";
+            const manoStr = player.mano === "izquierda" ? "Zurda" : player.mano === "ambidiestra" ? "Ambidiestra" : "Diestra";
+            const card = document.createElement("div");
+            card.className = "player-card";
+            card.innerHTML = `
+                <div class="player-avatar">${player.photoURL ? `<img src="${player.photoURL}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;">` : "📸"}</div>
+                <div class="player-info">
+                    <div class="player-name">${player.name || "Sin nombre"} ${plantillaHtml} ${ratingHtml}</div>
+                    <div class="player-details">${player.position || ""} · ${player.team || ""} · ${player.category || ""} · Salto ${player.salto || "?"}cm · ${manoStr}</div>
+                    ${player.observations ? `<div class="player-notes">📝 ${player.observations.substring(0,80)}</div>` : ""}
+                </div>
+                <div class="player-actions">
+                    <button class="edit-btn" data-id="${player.id}">✏️</button>
+                    <button class="delete-btn" data-id="${player.id}">🗑️</button>
+                </div>`;
+            list.appendChild(card);
+        });
+        list.querySelectorAll(".edit-btn").forEach(btn => btn.addEventListener("click", () => { editPlayer(btn.dataset.id); mostrarFormScout(); }));
+        list.querySelectorAll(".delete-btn").forEach(btn => btn.addEventListener("click", async () => {
+            if (!confirm("¿Eliminar esta jugadora? Si es de la plantilla, también desaparecerá de Asistencia y Partido.")) return;
+            const id = btn.dataset.id;
+            const player = allPlayers.find(p => p.id === id);
+            if (player?.photoURL) { /* la foto va embebida en el documento, no hay nada que borrar aparte */ }
+            await deleteDoc(doc(jugadorasCol(), id));
+            loadJugadoras();
+        }));
+    }
+
+    $("searchInput").addEventListener("input", renderPlayers);
+
+    $("toggleRatings").addEventListener("click", () => {
+        ratingsVisible = !ratingsVisible;
+        $("toggleRatings").classList.toggle("active", ratingsVisible);
+        $("toggleRatingsLabel").textContent = ratingsVisible ? "👁️ Mostrar valoraciones" : "👁️‍🗨️ Ocultar valoraciones";
+        renderPlayers();
+    });
+
+    $("exportBtn").addEventListener("click", () => {
+        const data = allPlayers.map(p => ({
+            "Nombre": p.name || "", "Plantilla propia": p.esPlantilla ? "Sí" : "No",
+            "Año nacimiento": p.birthYear || "", "Categoría": p.category || "",
+            "Equipo": p.team || "", "Posición": p.position || "", "Salto (cm)": p.salto || "",
+            "Mano dominante": p.mano === "izquierda" ? "Zurda" : p.mano === "ambidiestra" ? "Ambidiestra" : "Diestra",
+            "Valoración": p.rating || "", "Observaciones": p.observations || ""
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Captaciones");
+        XLSX.writeFile(wb, `captaciones_${getCurrentClub()}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    });
+
+    let esPlantillaActual = false;
+    function setPlantillaToggle(activo) {
+        esPlantillaActual = activo;
+        $("togglePlantilla").classList.toggle("active", activo);
+        $("camposPlantilla").style.display = activo ? "block" : "none";
+    }
+    $("togglePlantilla").addEventListener("click", () => setPlantillaToggle(!esPlantillaActual));
+
+    function resetForm() {
+        currentEditId = null; currentPhotoURL = null;
+        $("formTitle").textContent = "➕ Nueva jugadora";
+        $("playerId").value = "";
+        $("playerName").value = "";
+        setPlantillaToggle(false);
+        $("playerCurso").value = ""; $("playerNumero").value = ""; $("playerFechaNac").value = ""; $("playerDni").value = "";
+        $("playerBirthYear").value = "2012";
+        $("playerCategory").value = "Infantil";
+        $("playerTeam").value = "";
+        document.querySelectorAll("#positionChips .chip").forEach(c => c.classList.remove("selected"));
+        $("playerSalto").value = "";
+        document.querySelector('input[name="mano"][value="derecha"]').checked = true;
+        $("playerRating").value = "7.5"; $("ratingValue").textContent = "7.5";
+        $("playerObservations").value = "";
+        $("photoPreview").innerHTML = "👤"; $("photoText").textContent = "Sin foto seleccionada";
+    }
+
+    function editPlayer(id) {
+        const player = allPlayers.find(p => p.id === id);
+        if (!player) return;
+        currentEditId = id; currentPhotoURL = player.photoURL || null;
+        $("formTitle").textContent = "✏️ Editar jugadora";
+        $("playerId").value = id;
+        $("playerName").value = player.name || "";
+        setPlantillaToggle(!!player.esPlantilla);
+        $("playerCurso").value = player.curso || ""; $("playerNumero").value = player.numero || "";
+        $("playerFechaNac").value = player.fechaNac || ""; $("playerDni").value = player.dni || "";
+        $("playerBirthYear").value = player.birthYear || "2012";
+        $("playerCategory").value = player.category || "Infantil";
+        $("playerTeam").value = player.team || "";
+        document.querySelectorAll("#positionChips .chip").forEach(c => c.classList.toggle("selected", c.dataset.pos === player.position));
+        $("playerSalto").value = player.salto || "";
+        document.querySelector(`input[name="mano"][value="${player.mano || 'derecha'}"]`).checked = true;
+        $("playerRating").value = player.rating || "7.5"; $("ratingValue").textContent = player.rating || "7.5";
+        $("playerObservations").value = player.observations || "";
+        if (player.photoURL) {
+            $("photoPreview").innerHTML = `<img src="${player.photoURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+            $("photoText").textContent = "Foto actual";
+        } else { $("photoPreview").innerHTML = "👤"; $("photoText").textContent = "Sin foto"; }
+    }
+
+    $("newPlayerBtn").addEventListener("click", () => { resetForm(); mostrarFormScout(); });
+    $("cancelEditBtn").addEventListener("click", () => { resetForm(); mostrarListaScout(); });
+
+    // Posición: selección única (una jugadora, un puesto principal)
+    document.querySelectorAll("#positionChips .chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            document.querySelectorAll("#positionChips .chip").forEach(c => c.classList.remove("selected"));
+            chip.classList.add("selected");
+        });
+    });
+
+    $("playerRating").addEventListener("input", (e) => { $("ratingValue").textContent = e.target.value; });
+
+    $("cameraBtn").addEventListener("click", () => $("cameraInput").click());
+    $("galleryBtn").addEventListener("click", () => $("galleryInput").click());
+    $("cameraInput").addEventListener("change", (e) => handlePhotoFile(e.target.files[0]));
+    $("galleryInput").addEventListener("change", (e) => handlePhotoFile(e.target.files[0]));
+
+    // Comprimimos la foto en el propio móvil (máx. 400px, calidad 0.7) y la
+    // guardamos como imagen embebida en el documento — no usamos Firebase
+    // Storage (evita necesitar el plan de pago Blaze). El resultado pesa
+    // normalmente 30-100 KB, muy por debajo del límite de 1MB por documento.
+    function compressImage(file, maxSize = 400, quality = 0.7) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.width, h = img.height;
+                    if (w > h && w > maxSize) { h = Math.round(h * (maxSize / w)); w = maxSize; }
+                    else if (h > maxSize) { w = Math.round(w * (maxSize / h)); h = maxSize; }
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL("image/jpeg", quality));
+                };
+                img.onerror = reject;
+                img.src = e.target.result;
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function handlePhotoFile(file) {
+        if (!file) return;
+        $("photoText").textContent = "Comprimiendo foto...";
+        try {
+            currentPhotoURL = await compressImage(file);
+            $("photoPreview").innerHTML = `<img src="${currentPhotoURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;">`;
+            $("photoText").textContent = "Foto seleccionada";
+        } catch (e) {
+            alert("No se pudo procesar la foto");
+            $("photoText").textContent = "Sin foto";
+        }
+    }
+
+    $("saveBtn").addEventListener("click", async () => {
+        const user = getCurrentUser();
+        if (!user) { alert("Debes iniciar sesión"); return; }
+        if (!$("playerName").value.trim()) { alert("Falta el nombre de la jugadora"); return; }
+        const selectedChip = document.querySelector("#positionChips .chip.selected");
+        const manoValue = document.querySelector('input[name="mano"]:checked')?.value;
+
+        const playerData = {
+            name: $("playerName").value, esPlantilla: esPlantillaActual,
+            curso: $("playerCurso").value.trim(), numero: $("playerNumero").value.trim(),
+            fechaNac: $("playerFechaNac").value, dni: $("playerDni").value.trim(),
+            birthYear: $("playerBirthYear").value, category: $("playerCategory").value,
+            team: $("playerTeam").value, position: selectedChip ? selectedChip.dataset.pos : "",
+            salto: $("playerSalto").value, mano: manoValue,
+            rating: parseFloat($("playerRating").value), observations: $("playerObservations").value,
+            photoURL: currentPhotoURL, updatedAt: new Date(), createdBy: user.uid
+        };
+
+        if (currentEditId) {
+            await updateDoc(doc(jugadorasCol(), currentEditId), playerData);
+        } else {
+            playerData.createdAt = new Date();
+            await addDoc(jugadorasCol(), playerData);
+        }
+        resetForm();
+        loadJugadoras();
+    });
+
+    // Años de nacimiento
+    for (let y = 2018; y >= 2000; y--) {
+        const option = document.createElement("option");
+        option.value = y; option.textContent = y;
+        $("playerBirthYear").appendChild(option);
+    }
+    $("playerBirthYear").value = "2012";
+</script>
+
+<script type="module">
+    const { addDoc, getDocs, query, orderBy, where, deleteDoc, doc, setDoc, getDoc, jugadorasCol, asistenciasCol, partidosCol, getCurrentClub } = window.__cv;
+    const $ = (id) => document.getElementById(id);
+
+    const MOTIVOS = [
+        { id: "lesion", label: "Lesión" },
+        { id: "enfermo", label: "Enfermo" },
+        { id: "medico", label: "Médico" },
+        { id: "sinjustificar", label: "Sin justificar" },
+        { id: "otro", label: "Otro" }
+    ];
+    const JUSTIFICADOS = ["lesion", "enfermo", "medico", "otro"];
+
+    let plantilla = [];
+    let asistEstados = {}; // { jugadoraId: null (presente) | { motivo, nota } }
+    let motivoAbiertoPara = null;
+
+    window.loadAsistView = async function loadAsistView() {
+        const snap = await getDocs(query(jugadorasCol(), orderBy("name")));
+        plantilla = [];
+        snap.forEach(d => { const data = d.data(); if (data.esPlantilla) plantilla.push({ id: d.id, ...data }); });
+        if (!$("asistFecha").value) $("asistFecha").value = new Date().toISOString().slice(0, 10);
+        renderPlantillaList();
+        await cargarAsistenciaDelDia();
+    };
+
+    function renderPlantillaList() {
+        const cont = $("plantillaList");
+        cont.innerHTML = "";
+        if (plantilla.length === 0) {
+            cont.innerHTML = `<p style="font-size:0.8rem; color:#64748B;">Todavía no hay jugadoras marcadas como plantilla. Añádelas desde Scout.</p>`;
+            return;
+        }
+        plantilla.forEach(j => {
+            const row = document.createElement("div");
+            row.style = "padding:4px 0; font-size:0.85rem;";
+            row.innerHTML = `<span>${j.name}${j.curso ? ' · ' + j.curso : ''}</span>`;
+            cont.appendChild(row);
+        });
+        renderAsistTable();
+    }
+
+    $("irAScoutBtn").addEventListener("click", () => showView("scoutView"));
+
+    function renderAsistTable() {
+        const cont = $("asistTableBody");
+        cont.innerHTML = "";
+        plantilla.forEach(j => {
+            const falta = asistEstados[j.id]; // null si presente
+            const row = document.createElement("div");
+            row.className = "player-card";
+            row.style = "align-items:center;";
+            if (!falta) {
+                row.innerHTML = `
+                    <div class="player-info"><div class="player-name">${j.name}</div></div>
+                    <span class="estado-btn selected-presente" style="cursor:default;">Presente</span>
+                    <button class="estado-btn" data-marcar="${j.id}" style="margin-left:6px;">Marcar falta</button>`;
+            } else {
+                const motivoLabel = MOTIVOS.find(m => m.id === falta.motivo)?.label || falta.motivo;
+                row.innerHTML = `
+                    <div class="player-info"><div class="player-name">${j.name}</div><div class="player-details">Falta: ${motivoLabel}${falta.nota ? ' — ' + falta.nota : ''}</div></div>
+                    <button class="estado-btn" data-deshacer="${j.id}">Presente</button>`;
+            }
+            cont.appendChild(row);
+            if (motivoAbiertoPara === j.id) {
+                const panel = document.createElement("div");
+                panel.style = "padding:10px 14px 4px;";
+                panel.innerHTML = `
+                    <div class="chip-group" id="motivoChips-${j.id}"></div>
+                    <input type="text" id="motivoNota-${j.id}" placeholder="Nota (opcional)" style="margin-top:8px;">`;
+                cont.appendChild(panel);
+                const chipsCont = panel.querySelector(`#motivoChips-${j.id}`);
+                MOTIVOS.forEach(m => {
+                    const chip = document.createElement("span");
+                    chip.className = "chip";
+                    chip.textContent = m.label;
+                    chip.addEventListener("click", () => {
+                        asistEstados[j.id] = { motivo: m.id, nota: panel.querySelector(`#motivoNota-${j.id}`).value.trim() };
+                        motivoAbiertoPara = null;
+                        renderAsistTable();
+                    });
+                    chipsCont.appendChild(chip);
+                });
+            }
+        });
+        cont.querySelectorAll("[data-marcar]").forEach(btn => btn.addEventListener("click", () => {
+            motivoAbiertoPara = btn.dataset.marcar;
+            renderAsistTable();
+        }));
+        cont.querySelectorAll("[data-deshacer]").forEach(btn => btn.addEventListener("click", () => {
+            delete asistEstados[btn.dataset.deshacer];
+            renderAsistTable();
+        }));
+    }
+
+    $("asistFecha").addEventListener("change", cargarAsistenciaDelDia);
+
+    async function cargarAsistenciaDelDia() {
+        asistEstados = {};
+        motivoAbiertoPara = null;
+        const fecha = $("asistFecha").value;
+        if (!fecha) { renderAsistTable(); return; }
+        const q = query(asistenciasCol(), where("fecha", "==", fecha));
+        const snap = await getDocs(q);
+        snap.forEach(d => {
+            const data = d.data();
+            (data.registros || []).forEach(r => { if (r.estado === "falta") asistEstados[r.jugadoraId] = { motivo: r.motivo, nota: r.nota || "" }; });
+        });
+        renderAsistTable();
+    }
+
+    $("guardarAsistBtn").addEventListener("click", async () => {
+        const fecha = $("asistFecha").value;
+        if (!fecha) { alert("Elige una fecha"); return; }
+        const registros = plantilla.map(j => {
+            const f = asistEstados[j.id];
+            return f
+                ? { jugadoraId: j.id, nombre: j.name, estado: "falta", motivo: f.motivo, nota: f.nota || "" }
+                : { jugadoraId: j.id, nombre: j.name, estado: "presente" };
+        });
+        await setDoc(doc(asistenciasCol(), fecha), { fecha, registros, updatedAt: new Date() });
+        alert("✅ Asistencia guardada");
+    });
+
+    function motivoTexto(r) {
+        if (r.estado !== "falta") return "";
+        const label = MOTIVOS.find(m => m.id === r.motivo)?.label || r.motivo || "Falta";
+        return r.nota ? `${label} (${r.nota})` : label;
+    }
+
+    // Exportar solo la sesión/fecha actualmente cargada, en columna única —
+    // pensado para copiar y pegar en una Hoja de Google compartida.
+    $("exportSemanaBtn").addEventListener("click", async () => {
+        const fecha = $("asistFecha").value;
+        if (!fecha) { alert("Elige una fecha primero"); return; }
+        const filas = plantilla.map(j => {
+            const f = asistEstados[j.id];
+            return {
+                "Curso": j.curso || "", "Nombre": j.name, "Número": j.numero || "",
+                [fecha]: f ? motivoTexto({ estado: "falta", motivo: f.motivo, nota: f.nota }) : ""
+            };
+        });
+        const ws = XLSX.utils.json_to_sheet(filas);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, fecha);
+        XLSX.writeFile(wb, `asistencia_${getCurrentClub()}_sesion_${fecha}.xlsx`);
+    });
+
+    // Exportar tabla acumulada completa en el rango elegido, en el mismo
+    // formato ancho que la hoja INFANTIL del colegio: una columna por sesión.
+    $("exportHistoricoBtn").addEventListener("click", async () => {
+        const desde = $("exportDesde").value;
+        const hasta = $("exportHasta").value;
+        if (!desde || !hasta) { alert("Elige un rango de fechas"); return; }
+        const snapAsist = await getDocs(asistenciasCol());
+        const sesiones = [];
+        snapAsist.forEach(d => {
+            const data = d.data();
+            if (data.fecha < desde || data.fecha > hasta) return;
+            sesiones.push({ tipo: "entreno", fecha: data.fecha, data });
+        });
+        const snapPartidos = await getDocs(partidosCol());
+        snapPartidos.forEach(d => {
+            const data = d.data();
+            if (!data.fecha || data.fecha < desde || data.fecha > hasta) return;
+            sesiones.push({ tipo: "partido", fecha: data.fecha, data });
+        });
+        if (sesiones.length === 0) { alert("No hay asistencias ni partidos en ese rango"); return; }
+        sesiones.sort((a, b) => a.fecha < b.fecha ? -1 : 1);
+
+        const filas = plantilla.map(j => {
+            const fila = {
+                "Curso": j.curso || "", "Nombre": j.name, "Fecha nacimiento": j.fechaNac || "",
+                "DNI": j.dni || "", "Número": j.numero || ""
+            };
+            let injustificadas = 0, justificadas = 0, partidosF = 0;
+            sesiones.forEach(s => {
+                if (s.tipo === "entreno") {
+                    const reg = (s.data.registros || []).find(r => r.jugadoraId === j.id);
+                    fila[s.fecha] = reg ? motivoTexto(reg) : "";
+                    if (reg?.estado === "falta") {
+                        if (reg.motivo === "sinjustificar") injustificadas++; else justificadas++;
+                    }
+                } else {
+                    const estado = (s.data.convocatoria || {})[j.id] || "NC";
+                    fila[`${s.fecha} vs ${s.data.rival || "?"}`] = estado;
+                    if (estado === "F") partidosF++;
+                }
+            });
+            fila["Faltas injustificadas"] = injustificadas;
+            fila["Faltas justificadas"] = justificadas;
+            fila["Faltas totales"] = injustificadas + justificadas;
+            fila["Faltas a partidos (F)"] = partidosF;
+            return fila;
+        });
+
+        const ws = XLSX.utils.json_to_sheet(filas);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Asistencia");
+        XLSX.writeFile(wb, `asistencia_${getCurrentClub()}_${desde}_${hasta}.xlsx`);
+    });
+</script>
+
+<script type="module">
+    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, partidosCol, getCurrentUser } = window.__cv;
+    const $ = (id) => document.getElementById(id);
+
+    let plantillaPartido = [];
+    let convocatoria = {}; // { jugadoraId: 'C' | 'NC' | 'F' }, por defecto NC
+    let sextetoSeleccionado = []; // ids (solo entre 'C')
+    let cambios = []; // {sale, entra, saleNombre, entraNombre}
+    let editandoPartidoId = null;
+    let partidos = [];
+
+    window.loadPartidoView = async function loadPartidoView() {
+        const snap = await getDocs(query(jugadorasCol(), orderBy("name")));
+        plantillaPartido = [];
+        snap.forEach(d => { const data = d.data(); if (data.esPlantilla) plantillaPartido.push({ id: d.id, ...data }); });
+        mostrarListaPartidos();
+        await loadPartidosLista();
+    };
+
+    function mostrarListaPartidos() {
+        $("partidoListaCont").style.display = "block";
+        $("partidoFormCont").style.display = "none";
+    }
+    function mostrarFormPartido() {
+        $("partidoListaCont").style.display = "none";
+        $("partidoFormCont").style.display = "block";
+    }
+
+    async function loadPartidosLista() {
+        const snap = await getDocs(query(partidosCol(), orderBy("fecha", "desc")));
+        partidos = [];
+        snap.forEach(d => partidos.push({ id: d.id, ...d.data() }));
+        const cont = $("partidosLista");
+        cont.innerHTML = "";
+        partidos.forEach(p => {
+            const resumen = resumenResultado(p.sets || []);
+            const nConv = Object.values(p.convocatoria || {}).filter(e => e === "C" || e === "F").length;
+            const card = document.createElement("div");
+            card.className = "player-card";
+            card.innerHTML = `
+                <div class="player-info">
+                    <div class="player-name">${p.rival || "Sin rival"} <span class="player-rating">${resumen}</span></div>
+                    <div class="player-details">${p.fecha || ""} · ${p.torneo || ""} · ${nConv} convocadas</div>
+                </div>
+                <div class="player-actions">
+                    <button class="edit-btn" data-id="${p.id}">✏️</button>
+                    <button class="delete-btn" data-id="${p.id}">🗑️</button>
+                </div>`;
+            card.querySelector(".edit-btn").addEventListener("click", () => editarPartido(p.id));
+            card.querySelector(".delete-btn").addEventListener("click", async () => {
+                if (!confirm("¿Eliminar este partido?")) return;
+                await deleteDoc(doc(partidosCol(), p.id));
+                loadPartidosLista();
+            });
+            cont.appendChild(card);
+        });
+    }
+
+    function resumenResultado(sets) {
+        let ganados = 0, perdidos = 0;
+        sets.forEach(s => { if (s.local > s.rival) ganados++; else if (s.rival > s.local) perdidos++; });
+        if (ganados === 0 && perdidos === 0) return "Sin jugar";
+        return `${ganados}-${perdidos}`;
+    }
+
+    // ========== CONVOCATORIA (C / NC / F) ==========
+    function renderConvocatoriaList() {
+        const cont = $("convocatoriaList");
+        cont.innerHTML = "";
+        plantillaPartido.forEach(j => {
+            const estado = convocatoria[j.id] || "NC";
+            const row = document.createElement("div");
+            row.className = "player-card";
+            row.style = "align-items:center;";
+            row.innerHTML = `
+                <div class="player-info"><div class="player-name">${j.name}</div></div>
+                <button class="estado-btn ${estado === 'C' ? 'selected-presente' : ''}" data-id="${j.id}" data-estado="C">C</button>
+                <button class="estado-btn ${estado === 'NC' ? 'selected-justificada' : ''}" data-id="${j.id}" data-estado="NC">NC</button>
+                <button class="estado-btn ${estado === 'F' ? 'selected-ausente' : ''}" data-id="${j.id}" data-estado="F">F</button>`;
+            cont.appendChild(row);
+        });
+        cont.querySelectorAll(".estado-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                convocatoria[btn.dataset.id] = btn.dataset.estado;
+                if (btn.dataset.estado !== "C") sextetoSeleccionado = sextetoSeleccionado.filter(id => id !== btn.dataset.id);
+                renderConvocatoriaList();
+                renderSextetoChips();
+                renderCambioSelects();
+            });
+        });
+    }
+
+    function jugadorasConvocadas() {
+        return plantillaPartido.filter(j => convocatoria[j.id] === "C");
+    }
+
+    function renderSextetoChips() {
+        const cont = $("sextetoChips");
+        cont.innerHTML = "";
+        const convocadas = jugadorasConvocadas();
+        if (convocadas.length === 0) {
+            cont.innerHTML = `<p style="font-size:0.75rem; color:#64748B;">Marca primero jugadoras como "C" en la convocatoria.</p>`;
+            return;
+        }
+        convocadas.forEach(j => {
+            const chip = document.createElement("span");
+            chip.className = "chip" + (sextetoSeleccionado.includes(j.id) ? " selected" : "");
+            chip.textContent = j.name;
+            chip.dataset.id = j.id;
+            chip.addEventListener("click", () => {
+                if (sextetoSeleccionado.includes(j.id)) {
+                    sextetoSeleccionado = sextetoSeleccionado.filter(id => id !== j.id);
+                } else {
+                    if (sextetoSeleccionado.length >= 7) { alert("Máximo 6 titulares + líbero (7)"); return; }
+                    sextetoSeleccionado.push(j.id);
+                }
+                renderSextetoChips();
+            });
+            cont.appendChild(chip);
+        });
+    }
+
+    function renderCambioSelects() {
+        const sale = $("cambioSale"), entra = $("cambioEntra");
+        sale.innerHTML = ""; entra.innerHTML = "";
+        jugadorasConvocadas().forEach(j => {
+            const o1 = document.createElement("option"); o1.value = j.id; o1.textContent = "Sale: " + j.name; sale.appendChild(o1);
+            const o2 = document.createElement("option"); o2.value = j.id; o2.textContent = "Entra: " + j.name; entra.appendChild(o2);
+        });
+    }
+
+    function renderCambiosList() {
+        const cont = $("cambiosList");
+        cont.innerHTML = "";
+        cambios.forEach((c, i) => {
+            const row = document.createElement("div");
+            row.style = "display:flex; justify-content:space-between; align-items:center; padding:6px 0; font-size:0.8rem;";
+            row.innerHTML = `<span>${c.saleNombre} → ${c.entraNombre}</span><button data-i="${i}" style="background:none;border:none;cursor:pointer;">🗑️</button>`;
+            row.querySelector("button").addEventListener("click", () => { cambios.splice(i, 1); renderCambiosList(); });
+            cont.appendChild(row);
+        });
+    }
+
+    $("addCambioBtn").addEventListener("click", () => {
+        const saleId = $("cambioSale").value, entraId = $("cambioEntra").value;
+        if (!saleId || !entraId || saleId === entraId) return;
+        const saleNombre = plantillaPartido.find(j => j.id === saleId)?.name || "?";
+        const entraNombre = plantillaPartido.find(j => j.id === entraId)?.name || "?";
+        cambios.push({ sale: saleId, entra: entraId, saleNombre, entraNombre });
+        renderCambiosList();
+    });
+
+    function resetPartidoForm() {
+        editandoPartidoId = null;
+        $("partidoId").value = "";
+        $("partidoFecha").value = new Date().toISOString().slice(0, 10);
+        $("partidoRival").value = "";
+        $("partidoTorneo").value = "Torneo IMD Sevilla · Infantil";
+        convocatoria = {};
+        sextetoSeleccionado = [];
+        cambios = [];
+        ["set1local","set1rival","set2local","set2rival","set3local","set3rival"].forEach(id => $(id).value = "");
+        renderConvocatoriaList();
+        renderSextetoChips();
+        renderCambioSelects();
+        renderCambiosList();
+    }
+
+    $("nuevoPartidoBtn").addEventListener("click", () => { resetPartidoForm(); mostrarFormPartido(); });
+    $("cancelarPartidoBtn").addEventListener("click", () => { mostrarListaPartidos(); });
+
+    function editarPartido(id) {
+        const p = partidos.find(x => x.id === id);
+        if (!p) return;
+        editandoPartidoId = id;
+        $("partidoId").value = id;
+        $("partidoFecha").value = p.fecha || "";
+        $("partidoRival").value = p.rival || "";
+        $("partidoTorneo").value = p.torneo || "Torneo IMD Sevilla · Infantil";
+        convocatoria = { ...(p.convocatoria || {}) };
+        sextetoSeleccionado = p.sexteto || [];
+        cambios = p.cambios || [];
+        const sets = p.sets || [];
+        [0,1,2].forEach(i => {
+            $(`set${i+1}local`).value = sets[i]?.local ?? "";
+            $(`set${i+1}rival`).value = sets[i]?.rival ?? "";
+        });
+        renderConvocatoriaList();
+        renderSextetoChips();
+        renderCambioSelects();
+        renderCambiosList();
+        mostrarFormPartido();
+    }
+
+    $("guardarPartidoBtn").addEventListener("click", async () => {
+        const user = getCurrentUser();
+        if (!user) { alert("Debes iniciar sesión"); return; }
+        if (!$("partidoRival").value.trim()) { alert("Falta el nombre del rival"); return; }
+        const sets = [];
+        [0,1,2].forEach(i => {
+            const l = $(`set${i+1}local`).value, r = $(`set${i+1}rival`).value;
+            if (l !== "" && r !== "") sets.push({ local: parseInt(l), rival: parseInt(r) });
+        });
+        // Guardamos NC explícitamente para todas las que no sean C ni F,
+        // así el Excel siempre tiene un valor por jugadora y partido.
+        const convocatoriaCompleta = {};
+        plantillaPartido.forEach(j => { convocatoriaCompleta[j.id] = convocatoria[j.id] || "NC"; });
+
+        const partidoData = {
+            fecha: $("partidoFecha").value, rival: $("partidoRival").value, torneo: $("partidoTorneo").value,
+            convocatoria: convocatoriaCompleta, sexteto: sextetoSeleccionado, sets, cambios,
+            updatedAt: new Date(), createdBy: user.uid
+        };
+        if (editandoPartidoId) {
+            await updateDoc(doc(partidosCol(), editandoPartidoId), partidoData);
+        } else {
+            partidoData.createdAt = new Date();
+            await addDoc(partidosCol(), partidoData);
+        }
+        mostrarListaPartidos();
+        loadPartidosLista();
+    });
+</script>
+
+</body>
+</html>
