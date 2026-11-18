@@ -654,6 +654,8 @@
                     </div>
                     <div class="chip-group" id="lugarChips"></div>
                     <button id="guardarLugarBtn" class="link-btn" type="button">＋ Guardar este lugar</button>
+                    <input type="text" id="partidoMapsUrl" placeholder="Enlace exacto de Maps (opcional)" style="margin-top:8px;">
+                    <p class="hint" style="margin-top:6px;">Pulsa 🔎 Buscar, elige el sitio en Maps, toca Compartir → Copiar enlace y pégalo aquí. Si lo dejas vacío, el WhatsApp lleva un enlace de búsqueda del lugar.</p>
                 </div>
 
                 <div class="campo">
@@ -686,6 +688,9 @@
                     <div class="set-row"><span style="width:56px;">Set 3</span><input type="number" id="set3local" placeholder="Local" min="0"><span>-</span><input type="number" id="set3rival" placeholder="Rival" min="0"></div>
                     <div class="set-row"><span style="width:56px;">Set 4</span><input type="number" id="set4local" placeholder="Local" min="0"><span>-</span><input type="number" id="set4rival" placeholder="Rival" min="0"></div>
                     <div class="set-row"><span style="width:56px;">Set 5</span><input type="number" id="set5local" placeholder="Local" min="0"><span>-</span><input type="number" id="set5rival" placeholder="Rival" min="0"></div>
+                    <button id="waResBtn" class="btn-wa" type="button" style="margin-top:8px;">💬 Enviar resumen del partido por WhatsApp</button>
+                    <button id="copyResBtn" class="btn-mini" type="button" style="width:100%; margin-top:8px;">📋 Copiar resumen</button>
+                    <div id="resPreview" class="wa-preview" style="display:none;"></div>
                 </div>
 
                 <div class="campo">
@@ -1372,7 +1377,8 @@
         if ($("partidoFecha").value) out.push(`📅 ${fechaLarga($("partidoFecha").value)}`);
         if ($("partidoCitacion").value) out.push(`⏰ Citación: ${$("partidoCitacion").value}`);
         if ($("partidoHora").value) out.push(`🕒 Partido: ${$("partidoHora").value}`);
-        if (lugar) { out.push(`📍 ${lugar}`); out.push(`🗺️ ${mapsUrl(lugar)}`); }
+        const mapsLink = $("partidoMapsUrl").value.trim();
+        if (lugar || mapsLink) { if (lugar) out.push(`📍 ${lugar}`); out.push(`🗺️ ${mapsLink || mapsUrl(lugar)}`); }
         out.push("");
         out.push(`*Convocadas (${conv.length}):*`);
         conv.forEach(r => out.push(linea(r)));
@@ -1381,6 +1387,46 @@
         out.push("¡Vamos equipo! 💪");
         return out.join("\n");
     }
+    function leerSetsForm() {
+        const s = [];
+        for (let i = 1; i <= 5; i++) { const l = $(`set${i}local`).value, r = $(`set${i}rival`).value; if (l !== "" && r !== "") s.push({ local: +l, rival: +r }); }
+        return s;
+    }
+    function mensajeResumen() {
+        if (L && !L.setup) syncLiveAForm();
+        const sets = leerSetsForm();
+        const gl = sets.filter(s => s.local > s.rival).length, gr = sets.filter(s => s.rival > s.local).length;
+        const nl = (L && L.names && L.names.l) || getClubName();
+        const nr = (L && L.names && L.names.r) || $("partidoRival").value.trim() || "Rival";
+        const lugar = $("partidoLugar").value.trim();
+        const out = [];
+        out.push(`🏐 *RESULTADO · ${getClubName()} ${getCurrentCategoria()}*`);
+        const cab = [$("partidoTorneo").value.trim(), fechaLarga($("partidoFecha").value)].filter(Boolean).join(" · ");
+        if (cab) out.push(cab);
+        if (lugar) out.push(`📍 ${lugar}`);
+        out.push("");
+        out.push(`*${nl} ${gl} - ${gr} ${nr}*`);
+        if (sets.length) out.push("Sets: " + sets.map(s => `${s.local}-${s.rival}`).join(" · "));
+        if (cambios.length) {
+            out.push(""); out.push(`*Cambios (${cambios.length}):*`);
+            cambios.forEach(c => out.push(`- ${c.set ? `Set ${c.set} (${c.marcador}): ` : ""}sale ${c.saleNombre} · entra ${c.entraNombre}`));
+        }
+        return out.join("\n");
+    }
+    function mostrarResumen() {
+        if (!leerSetsForm().length) { $("resPreview").textContent = "Aún no hay sets con resultado."; $("resPreview").style.display = "block"; return null; }
+        const msg = mensajeResumen();
+        $("resPreview").textContent = msg; $("resPreview").style.display = "block";
+        return msg;
+    }
+    $("waResBtn").addEventListener("click", () => { const m = mostrarResumen(); if (m) window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); });
+    $("copyResBtn").addEventListener("click", async () => {
+        const m = mostrarResumen(); if (!m) return;
+        try { await navigator.clipboard.writeText(m); $("copyResBtn").textContent = "✅ Copiado"; } catch (e) { $("copyResBtn").textContent = "Selecciona el texto y cópialo"; }
+        setTimeout(() => { $("copyResBtn").textContent = "📋 Copiar resumen"; }, 2500);
+    });
+    window.__enviarResumenLive = () => { const m = mostrarResumen(); if (m) window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); };
+
     $("copyWaBtn").addEventListener("click", async () => {
         const msg = mensajeWhatsApp();
         const pv = $("waPreview"); pv.textContent = msg; pv.style.display = "block";
@@ -1438,7 +1484,7 @@
     const SET_N = 5;
     function limpiarFormulario() {
         $("partidoTorneo").value = "Torneo IMD Sevilla · Infantil";
-        $("partidoCitacion").value = ""; $("partidoHora").value = ""; $("partidoLugar").value = "";
+        $("partidoCitacion").value = ""; $("partidoHora").value = ""; $("partidoLugar").value = ""; $("partidoMapsUrl").value = "";
         convocatoria = {}; ajustes = {}; filiales = []; sextetoSeleccionado = []; cambios = [];
         $("prefillNote").style.display = "none";
     }
@@ -1460,6 +1506,7 @@
             filiales = JSON.parse(JSON.stringify(ult.filiales || []));
             $("partidoTorneo").value = ult.torneo || $("partidoTorneo").value;
             $("partidoLugar").value = ult.lugar || "";
+            $("partidoMapsUrl").value = ult.mapsUrl || "";
             $("partidoCitacion").value = ult.citacion || "";
             $("partidoHora").value = ult.hora || "";
             const nota = $("prefillNote");
@@ -1498,6 +1545,7 @@
         $("partidoRival").value = p.rival || "";
         $("partidoTorneo").value = p.torneo || "Torneo IMD Sevilla · Infantil";
         $("partidoLugar").value = p.lugar || "";
+        $("partidoMapsUrl").value = p.mapsUrl || "";
         $("partidoCitacion").value = p.citacion || "";
         $("partidoHora").value = p.hora || "";
         convocatoria = { ...(p.convocatoria || {}) };
@@ -1527,7 +1575,7 @@
         plantillaPartido.forEach(j => { convocatoriaCompleta[j.id] = convocatoria[j.id] || "NC"; });
         const partidoData = {
             fecha: $("partidoFecha").value, rival: $("partidoRival").value, torneo: $("partidoTorneo").value,
-            lugar: $("partidoLugar").value.trim(), citacion: $("partidoCitacion").value, hora: $("partidoHora").value,
+            lugar: $("partidoLugar").value.trim(), mapsUrl: $("partidoMapsUrl").value.trim(), citacion: $("partidoCitacion").value, hora: $("partidoHora").value,
             categoria: getCurrentCategoria(), convocatoria: convocatoriaCompleta, ajustes, filiales,
             sexteto: sextetoSeleccionado, sets, cambios,
             live: (L && !L.setup && !L.finished) ? JSON.parse(JSON.stringify(L)) : null,
@@ -1731,7 +1779,8 @@
             </div>`;
         if (L.finished) {
             html += `<div class="setover">🏁 Partido terminado · ${w.l}-${w.r}<br><small>${L.sets.map(s => s.local + "-" + s.rival).join(" · ")}</small>
-                <button class="btn-primary" data-act="finish">💾 Guardar y salir</button></div>`;
+                <button class="btn-wa" data-act="waRes" style="margin-top:8px;">💬 Enviar resumen por WhatsApp</button>
+                <button class="btn-primary" data-act="finish" style="margin-top:8px;">💾 Guardar y salir</button></div>`;
         } else if (over) {
             html += `<div class="setover">Set ${L.sets.length + 1} para ${esc(ganaLocal ? L.names.l : L.names.r)} (${L.a}-${L.b})<button class="btn-primary" data-act="closeSet">✔ Cerrar set</button></div>`;
         } else {
@@ -1818,6 +1867,7 @@
             guardarPartido(true, true).then(() => { if (editandoPartidoId) guardarLiveYa(); });
         }
         else if (act === "finish") { salirLive(true); }
+        else if (act === "waRes") { syncLiveAForm(); window.__enviarResumenLive(); }
         else if (act === "endAsk") { L.confirmEnd = true; renderLive(); }
         else if (act === "endNo") { L.confirmEnd = false; renderLive(); }
         else if (act === "endYes") {
