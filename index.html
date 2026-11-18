@@ -28,7 +28,7 @@
     // ============================================================
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const app = initializeApp(firebaseConfig);
@@ -58,7 +58,9 @@
     const appSection = $("appSection");
 
     // ========== AUTENTICACIÓN ==========
+    const VIEWER = new URLSearchParams(location.search).get("directo");
     onAuthStateChanged(auth, async (user) => {
+        if (VIEWER) return;
         if (user) {
             currentUser = user;
             const udocSnap = await getDoc(doc(db, "usuarios", user.uid));
@@ -191,6 +193,41 @@
     document.querySelectorAll(".home-tile").forEach(tile => {
         tile.addEventListener("click", () => showView(tile.dataset.target));
     });
+
+    // ========== VISTA EN DIRECTO (solo lectura, sin sesión) ==========
+    if (VIEWER) {
+        authSection.style.display = "none"; appSection.style.display = "none";
+        const dv = $("directoView"); dv.style.display = "block";
+        const dEsc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+        const pinta = (d) => {
+            if (!d) { dv.innerHTML = '<div class="app"><div class="lv-wrap" style="padding:40px 20px; text-align:center;">Este partido en directo ya no está disponible.</div></div>'; return; }
+            const c = CLUBS[d.club] || CLUBS.tomares;
+            const st = document.documentElement.style;
+            st.setProperty("--club-accent", c.accent); st.setProperty("--club-dark", c.accentDark);
+            st.setProperty("--pri", c.pri); st.setProperty("--alt", c.alt); st.setProperty("--ink", c.ink);
+            st.setProperty("--bright", c.bright); st.setProperty("--onbright", c.onbright);
+            const n = Math.ceil((d.best || 3) / 2);
+            const pips = (k) => Array.from({ length: n }, (_, i) => `<span class="pip ${i < k ? "on" : ""}"></span>`).join("");
+            const slot = (pos) => {
+                const x = (d.court || {})[pos];
+                const saca = pos === 1 && d.sv === "L" && !d.finished;
+                return `<div class="slot"><span class="pos">${pos}</span><div class="disc${x ? "" : " empty"}${x && x.lib ? " lib" : ""}${saca ? " saca" : ""}">${x ? dEsc(x.d) : ""}${x && x.lib ? '<span class="tag">L</span>' : ""}</div></div>`;
+            };
+            const rival = d.sv === "R" && !d.finished;
+            dv.innerHTML = `<div class="app"><div class="header"><div class="header-top"><div class="logo"><span class="logo-img"><img src="${c.logo}" alt=""></span><span>En directo</span></div><span style="font-size:0.75rem;">${d.finished ? "🏁 Finalizado" : "🔴 En juego"}</span></div>
+                <div style="font-size:0.75rem; opacity:0.85;">${dEsc(c.name)} · ${dEsc(d.categoria)} · ${dEsc(d.torneo)}</div></div>
+                <div class="lv-wrap" style="padding-top:16px;">
+                <div class="score">
+                    <div class="team"><div class="tname" style="font-weight:700;font-size:0.8rem;padding:4px;">${dEsc(d.nl)}</div><div class="pips">${pips(d.wl || 0)}</div><div class="bignum">${d.a}</div><div style="margin-top:6px;"><span class="sv-tag nos">${d.sv === "L" && !d.finished ? "● Saca" : "&nbsp;"}</span></div></div>
+                    <div class="vs">:</div>
+                    <div class="team"><div class="tname" style="font-weight:700;font-size:0.8rem;padding:4px;">${dEsc(d.nr)}</div><div class="pips">${pips(d.wr || 0)}</div><div class="bignum">${d.b}</div><div style="margin-top:6px;"><span class="sv-tag ${rival ? "rival" : "nos"}">${rival ? "Saca el rival" : "&nbsp;"}</span></div></div>
+                </div>
+                <div class="setinfo">${d.finished ? "Resultado final" : `Set ${(d.sets || []).length + 1} de ${d.best} · a ${d.pts} puntos`}${(d.sets || []).length ? "<br>Sets: " + d.sets.map(s => s.local + "-" + s.rival).join(" · ") : ""}</div>
+                <div class="court"><div class="court-grid">${[4, 3, 2, 5, 6, 1].map(slot).join("")}</div></div>
+                <p class="hint" style="text-align:center;">Se actualiza solo · ${dEsc(d.fecha)}</p></div></div>`;
+        };
+        onSnapshot(doc(db, "directos", VIEWER), (s) => pinta(s.exists() ? s.data() : null), () => pinta(null));
+    }
 
     // Exponer lo necesario a otros bloques <script> del archivo
     window.__cv = { db, auth, collection, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, where, setDoc, getDoc,
@@ -393,6 +430,8 @@
     <button id="installBannerBtn" style="display:none; background:#D8402F; color:white; border:none; padding:8px 14px; border-radius:20px; font-size:0.75rem; white-space:nowrap; cursor:pointer;">Instalar</button>
     <button id="installBannerClose" style="background:none; border:none; color:white; font-size:1.1rem; cursor:pointer; padding:0 4px;">✕</button>
 </div>
+
+<div id="directoView" style="display:none;"></div>
 
 <div id="authSection">
 <div class="auth-container">
@@ -1187,7 +1226,7 @@
 </script>
 
 <script type="module">
-    const { addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, partidosCol, getCurrentCategoria, getCurrentUser, getClubName } = window.__cv;
+    const { db, setDoc, addDoc, getDocs, query, orderBy, deleteDoc, doc, updateDoc, jugadorasCol, partidosCol, getCurrentClub, getCurrentCategoria, getCurrentUser, getClubName } = window.__cv;
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 
@@ -1795,6 +1834,12 @@
         const log = L.log.map(c => `<div>Set ${c.set}, ${c.a}-${c.b}: sale ${esc(byId(c.sale)?.name || "?")} · entra ${esc(byId(c.entra)?.name || "?")}</div>`).join("");
         html += `<div class="lv-sec">Cambios</div><div class="lv-log">${log || '<span style="color:var(--mut)">Toca el dorsal de una jugadora en pista para cambiarla por una del banquillo.</span>'}</div>`;
         if (!L.finished) {
+            html += L.share
+                ? `<div class="lv-log" style="margin-top:14px;"><b>📡 En directo (solo lectura)</b><div style="word-break:break-all; font-size:0.7rem; margin:6px 0; color:var(--mut);">${esc(linkDirecto())}</div>
+                    <div class="lv-actions"><button class="btn-mini" data-act="shareCopy">📋 Copiar</button><button class="btn-mini" data-act="shareWa">💬 WhatsApp</button><button class="btn-mini" data-act="shareOff">Dejar de compartir</button></div></div>`
+                : `<button class="btn-mini" data-act="shareOn" style="width:100%; margin-top:14px;">📡 Compartir en directo</button>`;
+        }
+        if (!L.finished) {
             const parcial = (L.a + L.b > 0 && !over) ? ` Se guardará el set en curso (${L.a}-${L.b}).` : "";
             html += L.confirmEnd
                 ? `<div class="setover" style="margin-top:14px;">¿Finalizar el partido?${parcial}<div class="lv-actions"><button class="btn-mini" data-act="endNo">No, seguir</button><button class="btn-primary" data-act="endYes" style="padding:10px;">Sí, finalizar</button></div></div>`
@@ -1805,9 +1850,33 @@
     }
 
     let liveTimer = null;
-    function guardarLiveYa() {
+    async function guardarLiveYa() {
         clearTimeout(liveTimer); liveTimer = null;
-        if (L && !L.setup && editandoPartidoId) { syncLiveAForm(); return guardarPartido(true, true); }
+        if (L && !L.setup && editandoPartidoId) {
+            syncLiveAForm();
+            const r = await guardarPartido(true, true);
+            await publicarDirecto();
+            return r;
+        }
+    }
+    const linkDirecto = () => location.origin + location.pathname + "?directo=" + editandoPartidoId;
+    // Copia pública SIN nombres de jugadoras: solo dorsales, marcador y sets.
+    async function publicarDirecto() {
+        if (!L || !L.share || !editandoPartidoId) return;
+        const court = {};
+        for (let p = 1; p <= 6; p++) {
+            const id = L.court[p], r = id ? byId(id) : null;
+            court[p] = r ? { d: r.numero || "–", lib: !!(L.libOn && id === L.libId) } : null;
+        }
+        const w = wins();
+        try {
+            await setDoc(doc(db, "directos", editandoPartidoId), {
+                club: getCurrentClub(), categoria: getCurrentCategoria(), nl: L.names.l, nr: L.names.r,
+                fecha: $("partidoFecha").value || "", torneo: $("partidoTorneo").value || "",
+                a: L.a, b: L.b, sv: L.sv, best: L.best, pts: target(), sets: L.sets, wl: w.l, wr: w.r,
+                court, finished: !!L.finished, updatedAt: new Date()
+            });
+        } catch (e) { console.error("No se pudo publicar el directo", e); }
     }
     function renderLive() {
         if (!L) return;
@@ -1867,6 +1936,10 @@
             guardarPartido(true, true).then(() => { if (editandoPartidoId) guardarLiveYa(); });
         }
         else if (act === "finish") { salirLive(true); }
+        else if (act === "shareOn") { L.share = true; publicarDirecto(); renderLive(); }
+        else if (act === "shareOff") { L.share = false; deleteDoc(doc(db, "directos", editandoPartidoId)).catch(() => {}); renderLive(); }
+        else if (act === "shareCopy") { navigator.clipboard.writeText(linkDirecto()).then(() => { t.textContent = "✅ Copiado"; }).catch(() => { t.textContent = "Copia el enlace de arriba"; }); }
+        else if (act === "shareWa") { window.open("https://wa.me/?text=" + encodeURIComponent("🏐 Sigue el partido en directo: " + linkDirecto()), "_blank"); }
         else if (act === "waRes") { syncLiveAForm(); window.__enviarResumenLive(); }
         else if (act === "endAsk") { L.confirmEnd = true; renderLive(); }
         else if (act === "endNo") { L.confirmEnd = false; renderLive(); }
@@ -1892,6 +1965,7 @@
             syncLiveAForm();
             renderSextetoResumen();
             if (!(await guardarPartido(true))) return;
+            await publicarDirecto();
             L = null;
             mostrarListaPartidos();
         } else {
