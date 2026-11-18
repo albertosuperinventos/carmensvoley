@@ -728,6 +728,7 @@
                     <div class="set-row"><span style="width:56px;">Set 3</span><input type="number" id="set3local" placeholder="Local" min="0"><span>-</span><input type="number" id="set3rival" placeholder="Rival" min="0"></div>
                     <div class="set-row"><span style="width:56px;">Set 4</span><input type="number" id="set4local" placeholder="Local" min="0"><span>-</span><input type="number" id="set4rival" placeholder="Rival" min="0"></div>
                     <div class="set-row"><span style="width:56px;">Set 5</span><input type="number" id="set5local" placeholder="Local" min="0"><span>-</span><input type="number" id="set5rival" placeholder="Rival" min="0"></div>
+                    <button id="xlsBtn" class="btn-mini" type="button" style="width:100%; margin-top:8px;">📊 Excel del partido (compartir / descargar)</button>
                     <button id="waResBtn" class="btn-wa" type="button" style="margin-top:8px;">💬 Enviar resumen del partido por WhatsApp</button>
                     <button id="copyResBtn" class="btn-mini" type="button" style="width:100%; margin-top:8px;">📋 Copiar resumen</button>
                     <div id="resPreview" class="wa-preview" style="display:none;"></div>
@@ -1465,6 +1466,45 @@
         try { await navigator.clipboard.writeText(m); $("copyResBtn").textContent = "✅ Copiado"; } catch (e) { $("copyResBtn").textContent = "Selecciona el texto y cópialo"; }
         setTimeout(() => { $("copyResBtn").textContent = "📋 Copiar resumen"; }, 2500);
     });
+    // ---------- Excel del partido (sin DNI) ----------
+    function construirXlsx() {
+        if (L && !L.setup) syncLiveAForm();
+        const sets = leerSetsForm();
+        const gl = sets.filter(s => s.local > s.rival).length, gr = sets.filter(s => s.rival > s.local).length;
+        const wb = XLSX.utils.book_new();
+        const resumen = [
+            ["Club", getClubName()], ["Categoría", getCurrentCategoria()], ["Competición", $("partidoTorneo").value],
+            ["Fecha", $("partidoFecha").value], ["Rival", $("partidoRival").value], ["Lugar", $("partidoLugar").value],
+            ["Resultado (sets)", `${gl}-${gr}`], [], ["Set", "Local", "Rival"],
+            ...sets.map((s, i) => [i + 1, s.local, s.rival])
+        ];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), "Resultado");
+        const conv = [["Nº", "Nombre", "Curso", "Estado"]];
+        rosterMatch().forEach(r => {
+            const base = plantillaPartido.find(j => j.id === r.id);
+            conv.push([r.numero || "", r.name, base ? (base.curso || "") : "Filial", r.filial ? "C" : (convocatoria[r.id] || "NC")]);
+        });
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(conv), "Convocatoria");
+        const cam = [["Set", "Marcador", "Sale", "Entra"]];
+        cambios.forEach(c => cam.push([c.set || "", c.marcador || "", c.saleNombre, c.entraNombre]));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cam), "Cambios");
+        return wb;
+    }
+    async function compartirXlsx() {
+        if (typeof XLSX === "undefined") { alert("No se pudo cargar el generador de Excel. Comprueba la conexión."); return; }
+        const wb = construirXlsx();
+        const limpia = (s) => String(s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+        const name = `partido_${limpia(getClubName())}_${limpia(getCurrentCategoria())}_${$("partidoFecha").value}_${limpia($("partidoRival").value)}.xlsx`;
+        const arr = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+        const file = new File([arr], name, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], title: "Partido " + $("partidoRival").value }); return; }
+            catch (e) { if (e && e.name === "AbortError") return; }
+        }
+        XLSX.writeFile(wb, name);
+    }
+    $("xlsBtn").addEventListener("click", compartirXlsx);
+    window.__compartirXlsx = compartirXlsx;
     window.__enviarResumenLive = () => { const m = mostrarResumen(); if (m) window.open("https://wa.me/?text=" + encodeURIComponent(m), "_blank"); };
 
     $("copyWaBtn").addEventListener("click", async () => {
@@ -1820,6 +1860,7 @@
         if (L.finished) {
             html += `<div class="setover">🏁 Partido terminado · ${w.l}-${w.r}<br><small>${L.sets.map(s => s.local + "-" + s.rival).join(" · ")}</small>
                 <button class="btn-wa" data-act="waRes" style="margin-top:8px;">💬 Enviar resumen por WhatsApp</button>
+                <button class="btn-mini" data-act="xls" style="width:100%; margin-top:8px;">📊 Excel del partido (enviar por WhatsApp)</button>
                 <button class="btn-primary" data-act="finish" style="margin-top:8px;">💾 Guardar y salir</button></div>`;
         } else if (over) {
             html += `<div class="setover">Set ${L.sets.length + 1} para ${esc(ganaLocal ? L.names.l : L.names.r)} (${L.a}-${L.b})<button class="btn-primary" data-act="closeSet">✔ Cerrar set</button></div>`;
@@ -1941,6 +1982,7 @@
         else if (act === "shareOff") { L.share = false; deleteDoc(doc(db, "directos", editandoPartidoId)).catch(() => {}); renderLive(); }
         else if (act === "shareCopy") { navigator.clipboard.writeText(linkDirecto()).then(() => { t.textContent = "✅ Copiado"; }).catch(() => { t.textContent = "Copia el enlace de arriba"; }); }
         else if (act === "shareWa") { window.open("https://wa.me/?text=" + encodeURIComponent("🏐 Sigue el partido en directo: " + linkDirecto()), "_blank"); }
+        else if (act === "xls") { syncLiveAForm(); window.__compartirXlsx(); }
         else if (act === "waRes") { syncLiveAForm(); window.__enviarResumenLive(); }
         else if (act === "endAsk") { L.confirmEnd = true; renderLive(); }
         else if (act === "endNo") { L.confirmEnd = false; renderLive(); }
