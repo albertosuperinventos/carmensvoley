@@ -1255,7 +1255,7 @@
             card.className = "player-card";
             card.innerHTML = `
                 <div class="player-info">
-                    <div class="player-name">${esc(p.rival) || "Sin rival"} <span class="player-rating">${resumen}</span></div>
+                    <div class="player-name">${esc(p.rival) || "Sin rival"} <span class="player-rating">${p.live && !p.live.setup ? "🔴 En juego" : resumen}</span></div>
                     <div class="player-details">${esc(p.fecha)} · ${esc(p.torneo)} · ${nConv} convocadas</div>
                 </div>
                 <div class="player-actions">
@@ -1263,6 +1263,12 @@
                     <button class="delete-btn" data-id="${p.id}">🗑️</button>
                 </div>`;
             card.querySelector(".edit-btn").addEventListener("click", () => editarPartido(p.id));
+            if (p.live && !p.live.setup) {
+                const cb = document.createElement("button");
+                cb.className = "btn-mini"; cb.style.marginTop = "8px"; cb.textContent = "▶ Continuar partido";
+                cb.addEventListener("click", () => { editarPartido(p.id); $("liveBtn").click(); });
+                card.querySelector(".player-info").appendChild(cb);
+            }
             card.querySelector(".delete-btn").addEventListener("click", async () => {
                 if (!confirm("¿Eliminar este partido?")) return;
                 await deleteDoc(doc(partidosCol(), p.id));
@@ -1475,7 +1481,7 @@
     function editarPartido(id) {
         const p = partidos.find(x => x.id === id);
         if (!p) return;
-        L = null;
+        L = (p.live && typeof p.live === "object" && !p.live.finished) ? p.live : null;
         editandoPartidoId = id;
         $("partidoId").value = id;
         $("prefillNote").style.display = "none";
@@ -1500,7 +1506,7 @@
         mostrarFormPartido();
     }
 
-    async function guardarPartido(silent) {
+    async function guardarPartido(silent, noReload) {
         const user = getCurrentUser();
         if (!user) { alert("Debes iniciar sesión"); return false; }
         if (!$("partidoRival").value.trim()) { alert("Falta el nombre del rival"); return false; }
@@ -1516,6 +1522,7 @@
             lugar: $("partidoLugar").value.trim(), citacion: $("partidoCitacion").value, hora: $("partidoHora").value,
             categoria: getCurrentCategoria(), convocatoria: convocatoriaCompleta, ajustes, filiales,
             sexteto: sextetoSeleccionado, sets, cambios,
+            live: (L && !L.setup && !L.finished) ? JSON.parse(JSON.stringify(L)) : null,
             updatedAt: new Date(), createdBy: user.uid
         };
         try {
@@ -1529,7 +1536,7 @@
             }
         } catch (e) { alert("❌ No se pudo guardar: " + e.message); return false; }
         if (!silent) { L = null; mostrarListaPartidos(); }
-        await loadPartidosLista();
+        if (!noReload) await loadPartidosLista();
         return true;
     }
     $("guardarPartidoBtn").addEventListener("click", () => guardarPartido(false));
@@ -1733,11 +1740,19 @@
         return html;
     }
 
+    let liveTimer = null;
+    function guardarLiveYa() {
+        clearTimeout(liveTimer); liveTimer = null;
+        if (L && !L.setup && editandoPartidoId) { syncLiveAForm(); return guardarPartido(true, true); }
+    }
     function renderLive() {
         if (!L) return;
         $("lvBody").innerHTML = L.setup ? setupHTML() : gameHTML();
         actualizarLiveBtn();
+        if (!L.setup && editandoPartidoId) { clearTimeout(liveTimer); liveTimer = setTimeout(guardarLiveYa, 500); }
     }
+    document.addEventListener("visibilitychange", () => { if (document.hidden && liveTimer) guardarLiveYa(); });
+    window.addEventListener("pagehide", () => { if (liveTimer) guardarLiveYa(); });
 
     $("lvBody").addEventListener("click", (e) => {
         const t = e.target.closest("[data-act]");
@@ -1785,6 +1800,7 @@
             if (L.libOn && L.libId) sextetoSeleccionado.push(L.libId);
             renderSextetoResumen();
             renderLive();
+            guardarPartido(true, true).then(() => { if (editandoPartidoId) guardarLiveYa(); });
         }
         else if (act === "finish") { salirLive(true); }
     });
@@ -1806,6 +1822,7 @@
             L = null;
             mostrarListaPartidos();
         } else {
+            await guardarLiveYa();
             refrescarForm();
             mostrarFormPartido();
         }
