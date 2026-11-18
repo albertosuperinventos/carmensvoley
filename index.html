@@ -1744,7 +1744,14 @@
             </div>`;
         html += cfgHTML();
         const log = L.log.map(c => `<div>Set ${c.set}, ${c.a}-${c.b}: sale ${esc(byId(c.sale)?.name || "?")} · entra ${esc(byId(c.entra)?.name || "?")}</div>`).join("");
-        html += `<div class="lv-sec">Cambios</div><div class="lv-log">${log || '<span style="color:var(--mut)">Toca el dorsal de una jugadora en pista para cambiarla por una del banquillo.</span>'}</div></div>`;
+        html += `<div class="lv-sec">Cambios</div><div class="lv-log">${log || '<span style="color:var(--mut)">Toca el dorsal de una jugadora en pista para cambiarla por una del banquillo.</span>'}</div>`;
+        if (!L.finished) {
+            const parcial = (L.a + L.b > 0 && !over) ? ` Se guardará el set en curso (${L.a}-${L.b}).` : "";
+            html += L.confirmEnd
+                ? `<div class="setover" style="margin-top:14px;">¿Finalizar el partido?${parcial}<div class="lv-actions"><button class="btn-mini" data-act="endNo">No, seguir</button><button class="btn-primary" data-act="endYes" style="padding:10px;">Sí, finalizar</button></div></div>`
+                : `<button class="btn-secondary" data-act="endAsk" style="margin-top:14px;">🏁 Finalizar partido</button>`;
+        }
+        html += `</div>`;
         return html;
     }
 
@@ -1811,6 +1818,14 @@
             guardarPartido(true, true).then(() => { if (editandoPartidoId) guardarLiveYa(); });
         }
         else if (act === "finish") { salirLive(true); }
+        else if (act === "endAsk") { L.confirmEnd = true; renderLive(); }
+        else if (act === "endNo") { L.confirmEnd = false; renderLive(); }
+        else if (act === "endYes") {
+            if (L.a + L.b > 0 && !isSetOver()) L.sets.push({ local: L.a, rival: L.b });
+            else if (isSetOver()) L.sets.push({ local: L.a, rival: L.b });
+            L.confirmEnd = false; L.finished = true;
+            salirLive(true);
+        }
     });
     $("lvBody").addEventListener("input", (e) => {
         if (!L) return;
