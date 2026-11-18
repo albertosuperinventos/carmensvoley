@@ -670,6 +670,7 @@
 
                 <div class="campo">
                     <button id="waBtn" class="btn-wa" type="button">💬 Enviar convocatoria por WhatsApp</button>
+                    <button id="copyWaBtn" class="btn-mini" type="button" style="width:100%; margin-top:8px;">📋 Copiar mensaje (con emojis)</button>
                     <div id="waPreview" class="wa-preview" style="display:none;"></div>
                 </div>
 
@@ -1363,7 +1364,7 @@
         const conv = convocadas().filter(r => !r.filial);
         const fil = rosterMatch().filter(r => r.filial && (r.name || r.numero));
         const lugar = $("partidoLugar").value.trim();
-        const linea = (r) => `• ${r.numero ? r.numero + " · " : ""}${r.name}`;
+        const linea = (r) => `- ${r.numero ? r.numero + " · " : ""}${r.name}`;
         const out = [];
         out.push(`🏐 *CONVOCATORIA · ${getClubName()} ${getCurrentCategoria()}*`);
         if ($("partidoTorneo").value.trim()) out.push(`🏆 ${$("partidoTorneo").value.trim()}`);
@@ -1380,6 +1381,13 @@
         out.push("¡Vamos equipo! 💪");
         return out.join("\n");
     }
+    $("copyWaBtn").addEventListener("click", async () => {
+        const msg = mensajeWhatsApp();
+        const pv = $("waPreview"); pv.textContent = msg; pv.style.display = "block";
+        try { await navigator.clipboard.writeText(msg); $("copyWaBtn").textContent = "✅ Copiado, pégalo en WhatsApp"; }
+        catch (e) { $("copyWaBtn").textContent = "Selecciona el texto de abajo y cópialo"; }
+        setTimeout(() => { $("copyWaBtn").textContent = "📋 Copiar mensaje (con emojis)"; }, 2500);
+    });
     $("waBtn").addEventListener("click", () => {
         if (convocadas().length === 0) { alert("Marca primero alguna jugadora como C"); return; }
         const msg = mensajeWhatsApp();
@@ -1835,8 +1843,22 @@
     });
 
     $("liveBtn").addEventListener("click", () => {
-        if (!$("partidoRival").value.trim()) { alert("Pon primero el rival"); return; }
-        if (convocadas().length < 6) { alert("Necesitas al menos 6 convocadas (C) o filiales para jugar en vivo"); return; }
+        const aviso = $("sextetoResumen");
+        if (!$("partidoRival").value.trim()) {
+            aviso.innerHTML = "⚠️ Escribe primero el <b>rival</b> (arriba) para iniciar el partido.";
+            aviso.style.color = "#E24B4A";
+            $("partidoRival").style.borderColor = "#E24B4A";
+            $("partidoRival").scrollIntoView({ behavior: "smooth", block: "center" });
+            $("partidoRival").focus();
+            return;
+        }
+        $("partidoRival").style.borderColor = "";
+        if (convocadas().length < 6) {
+            aviso.textContent = "⚠️ Necesitas al menos 6 convocadas (C) o filiales para jugar en vivo.";
+            aviso.style.color = "#E24B4A";
+            return;
+        }
+        aviso.style.color = ""; renderSextetoResumen();
         if (!L) L = nuevoLive();
         showOnly("partidoLiveCont");
         window.scrollTo({ top: 0 });
