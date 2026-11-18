@@ -67,10 +67,10 @@
             if (udocSnap.exists()) {
                 currentUserDoc = udocSnap.data();
             } else {
-                // Usuario nuevo sin perfil: rol coach sin clubes asignados por defecto.
-                // Un admin debe asignarle club/rol manualmente en Firestore.
-                currentUserDoc = { role: "coach", clubs: [] };
-                await setDoc(doc(db, "usuarios", user.uid), currentUserDoc);
+                // Las cuentas las crea el administrador (Authentication + documento en usuarios).
+                alert("Tu cuenta no tiene perfil asignado. Contacta con el administrador.");
+                await signOut(auth);
+                return;
             }
             const clubesPermitidos = currentUserDoc.role === "admin" ? Object.keys(CLUBS) : (currentUserDoc.clubs || []);
             if (clubesPermitidos.length === 0) {
@@ -308,6 +308,7 @@
     .set-row { display:flex; gap:8px; align-items:center; padding:0 20px; margin-bottom:10px; }
     .set-row input { text-align:center; }
     #appSection { display:none; }
+    .auth-tab[data-tab="register"], #registerForm { display:none !important; }
     #authSection { display:flex; justify-content:center; align-items:center; min-height:100vh; }
 
     /* ===== TEMA (claro / oscuro) + colores por club ===== */
