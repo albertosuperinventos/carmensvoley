@@ -1693,7 +1693,8 @@
         };
     }
     const need = () => Math.ceil(L.best / 2);
-    const target = () => (L.sets.length === L.best - 1 ? 15 : L.pts);
+    const decisivo = () => L.best >= 5 && L.sets.length === L.best - 1;
+    const target = () => (decisivo() ? 15 : L.pts);
     const isSetOver = () => Math.max(L.a, L.b) >= target() && Math.abs(L.a - L.b) >= 2;
     const wins = () => ({ l: L.sets.filter(s => s.local > s.rival).length, r: L.sets.filter(s => s.rival > s.local).length });
 
@@ -1865,7 +1866,7 @@
         } else if (over) {
             html += `<div class="setover">Set ${L.sets.length + 1} para ${esc(ganaLocal ? L.names.l : L.names.r)} (${L.a}-${L.b})<button class="btn-primary" data-act="closeSet">✔ Cerrar set</button></div>`;
         } else {
-            html += `<div class="setinfo">Set ${L.sets.length + 1} de ${L.best} · a ${target()} puntos${L.sets.length === L.best - 1 ? " (decisivo)" : ""}</div>`;
+            html += `<div class="setinfo">Set ${L.sets.length + 1} de ${L.best} · a ${target()} puntos${decisivo() ? " (decisivo)" : ""}</div>`;
         }
         html += courtHTML();
         html += `<div class="lv-actions">
